@@ -28,16 +28,31 @@ export default function ForceChangePasswordPage() {
 
   const handleSkip = async () => {
     if (!canSkip || !user) return;
+    setLoading(true);
 
-    // skip 횟수 증가
-    await supabase
-      .from('profiles')
-      .update({ password_skip_count: skipCount + 1 })
-      .eq('id', user.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/password-skip', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+      });
 
-    await refreshProfile();
-    router.push('/');
-    router.refresh();
+      if (!res.ok) {
+        setLoading(false);
+        return;
+      }
+
+      // sessionStorage에 스킵 표시 → 이번 세션에서 다시 안내 안 보여줌
+      sessionStorage.setItem('pw_skip_done', 'true');
+      await refreshProfile();
+      router.push('/');
+      router.refresh();
+    } catch {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

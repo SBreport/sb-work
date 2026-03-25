@@ -23,8 +23,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       if (skipCount >= 3) {
         // 3회 이상 건너뛰었으면 강제
         router.push('/force-change-password');
-      } else if (typeof window !== 'undefined' && !sessionStorage.getItem('pw_skip_shown')) {
-        // 이번 세션에서 아직 안내를 안 보여줬으면 표시
+      } else if (typeof window !== 'undefined' && !sessionStorage.getItem('pw_skip_done') && !sessionStorage.getItem('pw_skip_shown')) {
+        // 이번 세션에서 스킵하지 않았고, 안내를 아직 안 보여줬으면 표시
         sessionStorage.setItem('pw_skip_shown', 'true');
         router.push('/force-change-password');
       }

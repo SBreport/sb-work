@@ -17,7 +17,7 @@ export default function Home() {
     } else if (profile?.role === 'admin') {
       router.push('/admin/dashboard');
     } else {
-      router.push('/freelancer');
+      router.push('/my');
     }
   }, [user, profile, loading, router]);
 

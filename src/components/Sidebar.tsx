@@ -29,7 +29,7 @@ const adminMenuItems = [
 ];
 
 const freelancerMenuItems = [
-  { href: '/freelancer', label: '내 업무', icon: Briefcase },
+  { href: '/my', label: '내 업무', icon: Briefcase },
 ];
 
 interface SidebarProps {
@@ -64,7 +64,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const handleViewAs = (writerId: string) => {
     setViewAsWriter(writerId);
     setShowWriterSelect(false);
-    router.push('/freelancer');
+    router.push('/my');
     onClose?.();
   };
 

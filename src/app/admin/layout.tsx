@@ -12,11 +12,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!loading && profile && !isAdmin) {
       // 프리랜서가 /admin 접근 시 → 자기 페이지로 리다이렉트
-      router.replace('/freelancer');
+      router.replace('/my');
     }
     if (!loading && isAdmin && isViewingAs) {
-      // 관리자가 미리보기 모드에서 /admin 접근 시 → 프리랜서 페이지로 리다이렉트
-      router.replace('/freelancer');
+      // 관리자가 미리보기 모드에서 /admin 접근 시 → 내 업무 페이지로 리다이렉트
+      router.replace('/my');
     }
   }, [loading, profile, isAdmin, isViewingAs, router]);
 

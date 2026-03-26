@@ -25,17 +25,22 @@ function clean(val: string | null | undefined): string {
   return (val || '').replace(/,/g, '').trim();
 }
 
-interface MonthSummary { total: number; main: number; sub: number; optimal: number; inbl: number; }
+interface MonthSummary { total: number; writing: number; review: number; sub: number; optimal: number; inbl: number; }
 
 function calcSummary(assignments: Assignment[], userId: string): MonthSummary {
-  let main = 0, sub = 0, optimal = 0, inbl = 0;
+  let writing = 0, review = 0, sub = 0, optimal = 0, inbl = 0;
   for (const a of assignments) {
-    if (a.main_writer_id === userId) main += a.main_quantity;
+    if (a.main_writer_id === userId) {
+      // 부사수가 따로 있으면 → 검토, 없거나 본인이면 → 작성
+      const hasSeparateSub = a.sub_writer_id && a.sub_writer_id !== userId;
+      if (hasSeparateSub) review += a.main_quantity;
+      else writing += a.main_quantity;
+    }
     if (a.sub_writer_id === userId) sub += a.sub_quantity;
     if (a.optimal_writer_id === userId) optimal += a.optimal_quantity;
     if (a.inbl_writer_id === userId) inbl += a.inbl_quantity;
   }
-  return { total: main + sub + optimal + inbl, main, sub, optimal, inbl };
+  return { total: writing + review + sub + optimal + inbl, writing, review, sub, optimal, inbl };
 }
 
 interface MyAssignment extends Assignment {
@@ -51,13 +56,15 @@ type SortDir = 'asc' | 'desc';
 type ViewMode = 'table' | 'card';
 
 const ROLE_TAG: Record<string, string> = {
-  '사수': 'bg-blue-100 text-blue-700',
+  '작성': 'bg-blue-100 text-blue-700',
+  '검토': 'bg-indigo-100 text-indigo-700',
   '부사수': 'bg-green-100 text-green-700',
   '최적': 'bg-purple-100 text-purple-700',
   '인블': 'bg-amber-100 text-amber-700',
 };
 const ROLE_PILL: Record<string, string> = {
-  '사수': 'bg-blue-50 text-blue-700 border-blue-200',
+  '작성': 'bg-blue-50 text-blue-700 border-blue-200',
+  '검토': 'bg-indigo-50 text-indigo-700 border-indigo-200',
   '부사수': 'bg-green-50 text-green-700 border-green-200',
   '최적배포': 'bg-purple-50 text-purple-700 border-purple-200',
   '인블': 'bg-amber-50 text-amber-700 border-amber-200',
@@ -88,7 +95,8 @@ const typeColors: Record<string, string> = {
 interface MonthCard {
   month: string;
   total: number;
-  main: number;
+  writing: number;
+  review: number;
   sub: number;
   optimal: number;
   inbl: number;
@@ -121,23 +129,39 @@ export default function FreelancerPage() {
     if (!targetUserId) return;
     setMonthCardsLoading(true);
 
-    // 전체 배정에서 내 데이터만 가져오기
-    const { data: allAssignments } = await supabase
-      .from('assignments')
-      .select('month, main_writer_id, sub_writer_id, optimal_writer_id, inbl_writer_id, main_quantity, sub_quantity, optimal_quantity, inbl_quantity')
-      .or(`main_writer_id.eq.${targetUserId},sub_writer_id.eq.${targetUserId},optimal_writer_id.eq.${targetUserId},inbl_writer_id.eq.${targetUserId}`);
+    // 내 배정 + 시스템에 존재하는 전체 월 목록을 동시에 가져오기
+    const [myRes, allMonthsRes] = await Promise.all([
+      supabase
+        .from('assignments')
+        .select('month, main_writer_id, sub_writer_id, optimal_writer_id, inbl_writer_id, main_quantity, sub_quantity, optimal_quantity, inbl_quantity')
+        .or(`main_writer_id.eq.${targetUserId},sub_writer_id.eq.${targetUserId},optimal_writer_id.eq.${targetUserId},inbl_writer_id.eq.${targetUserId}`),
+      // 시스템에 존재하는 모든 월 (다른 작가 배정 포함)
+      supabase.from('assignments').select('month'),
+    ]);
 
+    const allAssignments = myRes.data;
     if (!allAssignments) { setMonthCardsLoading(false); return; }
+
+    // 시스템에 존재하는 전체 월 집합
+    const systemMonths = new Set<string>();
+    if (allMonthsRes.data) {
+      for (const row of allMonthsRes.data) systemMonths.add(row.month);
+    }
 
     // 월별 집계
     const monthMap = new Map<string, MonthCard>();
+    const emptyCard = (month: string): MonthCard => ({ month, total: 0, writing: 0, review: 0, sub: 0, optimal: 0, inbl: 0, branchCount: 0 });
+
     for (const a of allAssignments) {
-      if (!monthMap.has(a.month)) {
-        monthMap.set(a.month, { month: a.month, total: 0, main: 0, sub: 0, optimal: 0, inbl: 0, branchCount: 0 });
-      }
+      if (!monthMap.has(a.month)) monthMap.set(a.month, emptyCard(a.month));
       const card = monthMap.get(a.month)!;
       let counted = false;
-      if (a.main_writer_id === targetUserId) { card.main += a.main_quantity; counted = true; }
+      if (a.main_writer_id === targetUserId) {
+        const hasSeparateSub = a.sub_writer_id && a.sub_writer_id !== targetUserId;
+        if (hasSeparateSub) card.review += a.main_quantity;
+        else card.writing += a.main_quantity;
+        counted = true;
+      }
       if (a.sub_writer_id === targetUserId) { card.sub += a.sub_quantity; counted = true; }
       if (a.optimal_writer_id === targetUserId) { card.optimal += a.optimal_quantity; counted = true; }
       if (a.inbl_writer_id === targetUserId) { card.inbl += a.inbl_quantity; counted = true; }
@@ -145,27 +169,27 @@ export default function FreelancerPage() {
     }
 
     for (const card of monthMap.values()) {
-      card.total = card.main + card.sub + card.optimal + card.inbl;
+      card.total = card.writing + card.review + card.sub + card.optimal + card.inbl;
     }
 
-    // 가장 오래된 활동 월 ~ 현재 월 사이 빈 월도 0건 카드로 채움
+    // 가장 오래된 활동 월 ~ 시스템 최대 월 사이 빈 월도 0건 카드로 채움
     const currentMonth = getCurrentMonth();
-    const allMonths = Array.from(monthMap.keys());
-    if (allMonths.length > 0) {
-      allMonths.push(currentMonth);
-      allMonths.sort();
-      const earliest = allMonths[0];
-      const latest = allMonths[allMonths.length - 1] > currentMonth ? allMonths[allMonths.length - 1] : currentMonth;
+    const allMonthKeys = [...Array.from(monthMap.keys()), ...Array.from(systemMonths), currentMonth];
+    if (allMonthKeys.length > 0) {
+      allMonthKeys.sort();
+      // 내 활동이 있는 월만으로 earliest 결정 (시스템 월 전체를 earliest로 쓰면 불필요하게 과거가 길어짐)
+      const myMonths = Array.from(monthMap.keys());
+      if (myMonths.length === 0) { setMonthCardsLoading(false); return; }
+      myMonths.sort();
+      const earliest = myMonths[0];
+      const latest = allMonthKeys[allMonthKeys.length - 1];
 
-      // earliest ~ latest 사이 모든 월 생성
       const [ey, em] = earliest.split('-').map(Number);
       const [ly, lm] = latest.split('-').map(Number);
       let y = ey, m = em;
       while (y < ly || (y === ly && m <= lm)) {
         const key = `${y}-${String(m).padStart(2, '0')}`;
-        if (!monthMap.has(key)) {
-          monthMap.set(key, { month: key, total: 0, main: 0, sub: 0, optimal: 0, inbl: 0, branchCount: 0 });
-        }
+        if (!monthMap.has(key)) monthMap.set(key, emptyCard(key));
         m++;
         if (m > 12) { m = 1; y++; }
       }
@@ -233,7 +257,8 @@ export default function FreelancerPage() {
         let partnerRole: string | null = null;
 
         if (a.main_writer_id === uid) {
-          roles.push({ label: '사수', qty: a.main_quantity });
+          const hasSeparateSub = a.sub_writer_id && a.sub_writer_id !== uid;
+          roles.push({ label: hasSeparateSub ? '검토' : '작성', qty: a.main_quantity });
           const subName = (a.sub_writer as { name: string } | undefined)?.name || a.sub_writer_name || null;
           if (subName && a.sub_writer_id !== uid) { partnerName = subName; partnerRole = '부사수'; }
         }
@@ -331,7 +356,8 @@ export default function FreelancerPage() {
   const hasPartners = partnerSummary.partners.length > 0 || partnerSummary.bothCount > 0;
 
   const activeRoles = [
-    curSummary.main > 0 ? { label: '사수', qty: curSummary.main } : null,
+    curSummary.writing > 0 ? { label: '작성', qty: curSummary.writing } : null,
+    curSummary.review > 0 ? { label: '검토', qty: curSummary.review } : null,
     curSummary.sub > 0 ? { label: '부사수', qty: curSummary.sub } : null,
     curSummary.optimal > 0 ? { label: '최적배포', qty: curSummary.optimal } : null,
     curSummary.inbl > 0 ? { label: '인블', qty: curSummary.inbl } : null,
@@ -424,7 +450,8 @@ export default function FreelancerPage() {
               const isCurrent = card.month === currentMonth;
               const isUnseen = !viewedMonths.has(card.month) && card.month >= currentMonth;
               const roles = [
-                card.main > 0 ? { label: '사수', qty: card.main, color: 'text-blue-600' } : null,
+                card.writing > 0 ? { label: '작성', qty: card.writing, color: 'text-blue-600' } : null,
+                card.review > 0 ? { label: '검토', qty: card.review, color: 'text-indigo-600' } : null,
                 card.sub > 0 ? { label: '부사수', qty: card.sub, color: 'text-green-600' } : null,
                 card.optimal > 0 ? { label: '최적', qty: card.optimal, color: 'text-purple-600' } : null,
                 card.inbl > 0 ? { label: '인블', qty: card.inbl, color: 'text-amber-600' } : null,

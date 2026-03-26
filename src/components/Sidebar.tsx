@@ -44,7 +44,7 @@ interface WriterOption {
 export default function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile, signOut, isAdmin, viewAsWriterId, viewAsProfile, setViewAsWriter, isViewingAs } = useAuth();
+  const { profile, signOut, isAdmin, isEditor, viewAsWriterId, viewAsProfile, setViewAsWriter, isViewingAs } = useAuth();
   const [writers, setWriters] = useState<WriterOption[]>([]);
   const [showWriterSelect, setShowWriterSelect] = useState(false);
 
@@ -76,9 +76,12 @@ export default function Sidebar({ onClose }: SidebarProps) {
     onClose?.();
   };
 
+  // 편집자용 메뉴: 데이터 가져오기 숨김
+  const editorMenuItems = adminMenuItems.filter(item => item.href !== '/admin/import');
+
   // 현재 모드에 따라 메뉴 결정
   const isInViewMode = isAdmin && isViewingAs;
-  const menuItems = isInViewMode ? freelancerMenuItems : (isAdmin ? adminMenuItems : freelancerMenuItems);
+  const menuItems = isInViewMode ? freelancerMenuItems : (isEditor ? editorMenuItems : (isAdmin ? adminMenuItems : freelancerMenuItems));
 
   const handleLinkClick = () => {
     onClose?.();
@@ -176,7 +179,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
           <div>
             <p className="text-sm font-medium text-gray-900">{profile?.name}</p>
             <p className="text-xs text-gray-500">
-              {isAdmin ? '관리자' : '프리랜서'}
+              {isEditor ? '편집자' : isAdmin ? '관리자' : '프리랜서'}
             </p>
           </div>
           <button

@@ -18,7 +18,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
     // 프리랜서 첫 로그인 시 비밀번호 변경 안내
     // 3회까지 건너뛰기 가능, 3회 초과 시 강제
-    if (!loading && user && profile?.must_change_password && profile?.role !== 'admin') {
+    if (!loading && user && profile?.must_change_password && profile?.role !== 'admin' && profile?.role !== 'editor') {
       const skipCount = profile?.password_skip_count || 0;
       if (skipCount >= 3) {
         // 3회 이상 건너뛰었으면 강제

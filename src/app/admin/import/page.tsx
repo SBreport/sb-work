@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { authFetch } from '@/lib/api-client';
+import { useAuth } from '@/lib/auth-context';
 import { Upload, Check, AlertCircle, Loader2, Trash2, FileText, X } from 'lucide-react';
 
 interface FileItem {
@@ -35,6 +37,8 @@ function monthLabel(month: string): string {
 }
 
 export default function ImportPage() {
+  const { isEditor } = useAuth();
+  const router = useRouter();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -42,6 +46,12 @@ export default function ImportPage() {
   const [deletingMonth, setDeletingMonth] = useState(false);
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // 편집자는 이 페이지에 접근할 수 없음
+  if (isEditor) {
+    router.push('/admin/dashboard');
+    return null;
+  }
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files;

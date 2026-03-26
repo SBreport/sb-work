@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import type { Branch } from '@/types/database';
 import { Plus, Trash2 } from 'lucide-react';
 
 const CATEGORIES = ['피부과', '내과', '산부인과', '한의원', '성형외과', '정형외과', '치과', '안과', '기타'];
 
 export default function BranchesPage() {
+  const { isEditor } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('전체');
@@ -49,17 +51,19 @@ export default function BranchesPage() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-gray-900">지점 관리</h2>
-        <button
-          onClick={() => setShowAddBranch(!showAddBranch)}
-          className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <Plus size={16} />
-          지점 추가
-        </button>
+        {!isEditor && (
+          <button
+            onClick={() => setShowAddBranch(!showAddBranch)}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <Plus size={16} />
+            지점 추가
+          </button>
+        )}
       </div>
 
       {/* 지점 추가 폼 */}
-      {showAddBranch && (
+      {showAddBranch && !isEditor && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">새 지점 등록</h3>
           <form onSubmit={handleAddBranch} className="flex gap-4 items-end">
@@ -143,7 +147,7 @@ export default function BranchesPage() {
                     <th className="px-6 py-3 text-left font-medium text-gray-600">과목</th>
                     <th className="px-6 py-3 text-left font-medium text-gray-600">상품 유형</th>
                     <th className="px-6 py-3 text-center font-medium text-gray-600">상태</th>
-                    <th className="px-6 py-3 text-center font-medium text-gray-600">관리</th>
+                    {!isEditor && <th className="px-6 py-3 text-center font-medium text-gray-600">관리</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -172,26 +176,38 @@ export default function BranchesPage() {
                       )}
                     </td>
                     <td className="px-6 py-3 text-center">
-                      <button
-                        onClick={() => toggleBranchStatus(b)}
-                        className={`px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${
+                      {isEditor ? (
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                           b.status === 'active'
-                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                            : 'bg-red-100 text-red-700 hover:bg-red-200'
-                        }`}
-                      >
-                        {b.status === 'active' ? '활성' : '해지'}
-                      </button>
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {b.status === 'active' ? '활성' : '해지'}
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => toggleBranchStatus(b)}
+                          className={`px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${
+                            b.status === 'active'
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                          }`}
+                        >
+                          {b.status === 'active' ? '활성' : '해지'}
+                        </button>
+                      )}
                     </td>
-                    <td className="px-6 py-3 text-center">
-                      <button
-                        onClick={() => deleteBranch(b.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50"
-                        title="지점 삭제"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
+                    {!isEditor && (
+                      <td className="px-6 py-3 text-center">
+                        <button
+                          onClick={() => deleteBranch(b.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50"
+                          title="지점 삭제"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

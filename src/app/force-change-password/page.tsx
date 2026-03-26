@@ -96,11 +96,26 @@ export default function ForceChangePasswordPage() {
       return;
     }
 
-    if (user) {
-      await supabase
-        .from('profiles')
-        .update({ must_change_password: false, password_skip_count: 0 })
-        .eq('id', user.id);
+    // service_role API로 must_change_password 플래그 해제 (RLS 우회)
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/complete-password-change', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+      });
+
+      if (!res.ok) {
+        setError('비밀번호는 변경되었으나 프로필 업데이트에 실패했습니다. 다시 로그인해주세요.');
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError('서버 연결에 실패했습니다. 다시 시도해주세요.');
+      setLoading(false);
+      return;
     }
 
     await refreshProfile();

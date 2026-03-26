@@ -12,6 +12,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
+  isEditor: boolean;
   refreshProfile: () => Promise<void>;
   // 관리자 모드 전환
   viewAsWriterId: string | null;
@@ -92,8 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const setViewAsWriter = (writerId: string | null) => {
-    // 관리자만 사용 가능
-    if (profile?.role !== 'admin') return;
+    // 관리자/편집자만 사용 가능
+    if (profile?.role !== 'admin' && profile?.role !== 'editor') return;
     setViewAsWriterId(writerId);
   };
 
@@ -104,7 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       signIn,
       signOut,
-      isAdmin: profile?.role === 'admin',
+      isAdmin: profile?.role === 'admin' || profile?.role === 'editor',
+      isEditor: profile?.role === 'editor',
       refreshProfile,
       viewAsWriterId,
       viewAsProfile,

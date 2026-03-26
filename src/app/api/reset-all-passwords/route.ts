@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase-server';
-import { requireAdmin } from '@/lib/auth-guard';
+import { requireAdminOnly } from '@/lib/auth-guard';
 
 // 프리랜서 전원 비밀번호를 "010010"으로 리셋
 export async function POST(request: NextRequest) {
   // 관리자 인증 확인
-  const auth = await requireAdmin(request);
+  const auth = await requireAdminOnly(request);
   if (auth instanceof NextResponse) return auth;
 
   const supabase = createServerSupabase();

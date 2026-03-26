@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'freelancer';
+export type UserRole = 'admin' | 'editor' | 'freelancer';
 
 export type AssignmentStatus = 'active' | 'new' | 'changed' | 'terminated' | 'ai' | 'both';
 

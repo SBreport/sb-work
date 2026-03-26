@@ -37,7 +37,7 @@ interface LogEntry {
 }
 
 export default function AssignmentsPage() {
-  const { user } = useAuth();
+  const { user, isEditor } = useAuth();
   const [month, setMonth] = useState(getCurrentMonth());
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [writers, setWriters] = useState<Pick<User, 'id' | 'name'>[]>([]);
@@ -232,34 +232,36 @@ export default function AssignmentsPage() {
           <h2 className="text-lg font-bold text-gray-900">배정 관리</h2>
           <MonthSelector month={month} onChange={setMonth} />
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleExportCSV}
-            disabled={assignments.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40"
-          >
-            <Download size={14} />
-            CSV
-          </button>
-          <button
-            onClick={handleCopyPrevMonth}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            <Copy size={14} />
-            전월 복사
-          </button>
-          <button
-            onClick={() => setModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <Plus size={14} />
-            새 배정
-          </button>
-        </div>
+        {!isEditor && (
+          <div className="flex gap-2">
+            <button
+              onClick={handleExportCSV}
+              disabled={assignments.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40"
+            >
+              <Download size={14} />
+              CSV
+            </button>
+            <button
+              onClick={handleCopyPrevMonth}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              <Copy size={14} />
+              전월 복사
+            </button>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <Plus size={14} />
+              새 배정
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 인라인 편집 안내 */}
-      <p className="text-xs text-gray-400 mb-2">셀을 클릭하면 바로 수정할 수 있습니다.</p>
+      {!isEditor && <p className="text-xs text-gray-400 mb-2">셀을 클릭하면 바로 수정할 수 있습니다.</p>}
 
       {/* 배정 테이블 */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -280,7 +282,7 @@ export default function AssignmentsPage() {
                 <th className="px-2 py-2.5 text-center font-semibold text-amber-600 w-12">수량</th>
                 <th className="px-2 py-2.5 text-center font-semibold text-gray-600 w-14">상태</th>
                 <th className="px-2 py-2.5 text-left font-semibold text-gray-600">비고</th>
-                <th className="px-2 py-2.5 text-center font-semibold text-gray-600 w-8"></th>
+                {!isEditor && <th className="px-2 py-2.5 text-center font-semibold text-gray-600 w-8"></th>}
               </tr>
             </thead>
             <tbody>
@@ -295,17 +297,44 @@ export default function AssignmentsPage() {
                   const opt = getWriterDisplay(a.optimal_writer, a.optimal_writer_name, 'optimal');
                   const inbl = getWriterDisplay(a.inbl_writer, a.inbl_writer_name, 'inbl');
 
+                  const renderWriterCell = (writerName: string, colorClass: string, writerId: string, role: string) => {
+                    if (isEditor) {
+                      return (
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${writerName ? colorClass : ''}`}>
+                          {writerName || '-'}
+                        </span>
+                      );
+                    }
+                    return (
+                      <InlineSelectCell
+                        value={writerId}
+                        options={writerOptions}
+                        onSave={(v) => updateWriter(a.id, role, v)}
+                        renderDisplay={(_, label) => (
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${writerName ? colorClass : ''}`}>
+                            {writerName || label}
+                          </span>
+                        )}
+                        placeholder="-"
+                      />
+                    );
+                  };
+
                   return (
                     <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                       {/* 갱신일 */}
                       <td className="px-2 py-1.5">
-                        <InlineEditCell
-                          value={a.renewal_day}
-                          type="number"
-                          min={1}
-                          onSave={(v) => updateField(a.id, 'renewal_day', v)}
-                          displayClassName="text-gray-600"
-                        />
+                        {isEditor ? (
+                          <span className="text-gray-600">{a.renewal_day}</span>
+                        ) : (
+                          <InlineEditCell
+                            value={a.renewal_day}
+                            type="number"
+                            min={1}
+                            onSave={(v) => updateField(a.id, 'renewal_day', v)}
+                            displayClassName="text-gray-600"
+                          />
+                        )}
                       </td>
                       {/* 과목 */}
                       <td className="px-2 py-1.5">
@@ -319,99 +348,69 @@ export default function AssignmentsPage() {
                       </td>
                       {/* 사수 */}
                       <td className="px-2 py-1.5">
-                        <InlineSelectCell
-                          value={a.main_writer_id || ''}
-                          options={writerOptions}
-                          onSave={(v) => updateWriter(a.id, 'main', v)}
-                          renderDisplay={(_, label) => (
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${main.writerName ? main.colorClass : ''}`}>
-                              {main.writerName || label}
-                            </span>
-                          )}
-                          placeholder="-"
-                        />
+                        {renderWriterCell(main.writerName, main.colorClass, a.main_writer_id || '', 'main')}
                       </td>
                       <td className="px-2 py-1.5 text-center">
-                        <InlineEditCell value={a.main_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'main_quantity', v)} />
+                        {isEditor ? <span>{a.main_quantity}</span> : <InlineEditCell value={a.main_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'main_quantity', v)} />}
                       </td>
                       {/* 부사수 */}
                       <td className="px-2 py-1.5">
-                        <InlineSelectCell
-                          value={a.sub_writer_id || ''}
-                          options={writerOptions}
-                          onSave={(v) => updateWriter(a.id, 'sub', v)}
-                          renderDisplay={(_, label) => (
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${sub.writerName ? sub.colorClass : ''}`}>
-                              {sub.writerName || label}
-                            </span>
-                          )}
-                          placeholder="-"
-                        />
+                        {renderWriterCell(sub.writerName, sub.colorClass, a.sub_writer_id || '', 'sub')}
                       </td>
                       <td className="px-2 py-1.5 text-center">
-                        <InlineEditCell value={a.sub_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'sub_quantity', v)} />
+                        {isEditor ? <span>{a.sub_quantity}</span> : <InlineEditCell value={a.sub_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'sub_quantity', v)} />}
                       </td>
                       {/* 최적배포 */}
                       <td className="px-2 py-1.5">
-                        <InlineSelectCell
-                          value={a.optimal_writer_id || ''}
-                          options={writerOptions}
-                          onSave={(v) => updateWriter(a.id, 'optimal', v)}
-                          renderDisplay={(_, label) => (
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${opt.writerName ? opt.colorClass : ''}`}>
-                              {opt.writerName || label}
-                            </span>
-                          )}
-                          placeholder="-"
-                        />
+                        {renderWriterCell(opt.writerName, opt.colorClass, a.optimal_writer_id || '', 'optimal')}
                       </td>
                       <td className="px-2 py-1.5 text-center">
-                        <InlineEditCell value={a.optimal_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'optimal_quantity', v)} />
+                        {isEditor ? <span>{a.optimal_quantity}</span> : <InlineEditCell value={a.optimal_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'optimal_quantity', v)} />}
                       </td>
                       {/* 인블 */}
                       <td className="px-2 py-1.5">
-                        <InlineSelectCell
-                          value={a.inbl_writer_id || ''}
-                          options={writerOptions}
-                          onSave={(v) => updateWriter(a.id, 'inbl', v)}
-                          renderDisplay={(_, label) => (
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${inbl.writerName ? inbl.colorClass : ''}`}>
-                              {inbl.writerName || label}
-                            </span>
-                          )}
-                          placeholder="-"
-                        />
+                        {renderWriterCell(inbl.writerName, inbl.colorClass, a.inbl_writer_id || '', 'inbl')}
                       </td>
                       <td className="px-2 py-1.5 text-center">
-                        <InlineEditCell value={a.inbl_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'inbl_quantity', v)} />
+                        {isEditor ? <span>{a.inbl_quantity}</span> : <InlineEditCell value={a.inbl_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'inbl_quantity', v)} />}
                       </td>
                       {/* 상태 */}
                       <td className="px-2 py-1.5 text-center">
-                        <InlineSelectCell
-                          value={a.status}
-                          options={STATUS_OPTIONS}
-                          onSave={(v) => updateField(a.id, 'status', v)}
-                          renderDisplay={() => <StatusBadge status={a.status as AssignmentStatus} />}
-                        />
+                        {isEditor ? (
+                          <StatusBadge status={a.status as AssignmentStatus} />
+                        ) : (
+                          <InlineSelectCell
+                            value={a.status}
+                            options={STATUS_OPTIONS}
+                            onSave={(v) => updateField(a.id, 'status', v)}
+                            renderDisplay={() => <StatusBadge status={a.status as AssignmentStatus} />}
+                          />
+                        )}
                       </td>
                       {/* 비고 */}
                       <td className="px-2 py-1.5">
-                        <InlineEditCell
-                          value={a.note || ''}
-                          onSave={(v) => updateField(a.id, 'note', v)}
-                          placeholder="-"
-                          displayClassName="text-gray-500 max-w-[150px] truncate"
-                        />
+                        {isEditor ? (
+                          <span className="text-gray-500 max-w-[150px] truncate">{a.note || '-'}</span>
+                        ) : (
+                          <InlineEditCell
+                            value={a.note || ''}
+                            onSave={(v) => updateField(a.id, 'note', v)}
+                            placeholder="-"
+                            displayClassName="text-gray-500 max-w-[150px] truncate"
+                          />
+                        )}
                       </td>
                       {/* 삭제 */}
-                      <td className="px-2 py-1.5 text-center">
-                        <button
-                          onClick={() => handleDelete(a.id)}
-                          className="p-1 text-gray-300 hover:text-red-500 rounded hover:bg-red-50"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </td>
+                      {!isEditor && (
+                        <td className="px-2 py-1.5 text-center">
+                          <button
+                            onClick={() => handleDelete(a.id)}
+                            className="p-1 text-gray-300 hover:text-red-500 rounded hover:bg-red-50"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })

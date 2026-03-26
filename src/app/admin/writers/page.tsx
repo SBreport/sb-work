@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import { authFetch } from '@/lib/api-client';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import type { User } from '@/types/database';
 import { Plus, Pencil } from 'lucide-react';
 import WriterEditModal from './WriterEditModal';
 
 export default function WritersPage() {
+  const { isEditor } = useAuth();
   const [writers, setWriters] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingWriter, setEditingWriter] = useState<User | null>(null);
@@ -61,17 +63,19 @@ export default function WritersPage() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-gray-900">담당자 관리</h2>
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <Plus size={16} />
-          담당자 추가
-        </button>
+        {!isEditor && (
+          <button
+            onClick={() => setShowAdd(!showAdd)}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <Plus size={16} />
+            담당자 추가
+          </button>
+        )}
       </div>
 
       {/* 추가 폼 */}
-      {showAdd && (
+      {showAdd && !isEditor && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">새 담당자 계정 생성</h3>
           <form onSubmit={handleAddWriter} className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -148,6 +152,8 @@ export default function WritersPage() {
                   <td className="px-6 py-3 text-center">
                     {w.role === 'admin' ? (
                       <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">관리자</span>
+                    ) : w.role === 'editor' ? (
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">편집자</span>
                     ) : (
                       <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                         w.contract_type === 'business'
@@ -166,7 +172,7 @@ export default function WritersPage() {
                     </span>
                   </td>
                   <td className="px-6 py-3 text-center">
-                    {w.role !== 'admin' && (
+                    {w.role !== 'admin' && w.role !== 'editor' && !isEditor && (
                       <button
                         onClick={() => setEditingWriter(w)}
                         className="p-1.5 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50"

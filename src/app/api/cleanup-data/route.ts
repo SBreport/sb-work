@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase-server';
-import { requireAdmin } from '@/lib/auth-guard';
+import { requireAdminOnly } from '@/lib/auth-guard';
 
 function stripCommas(val: string | null): string {
   if (!val) return '';
@@ -8,7 +8,7 @@ function stripCommas(val: string | null): string {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireAdminOnly(request);
   if (auth instanceof NextResponse) return auth;
 
   const supabase = createServerSupabase();

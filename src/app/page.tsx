@@ -12,9 +12,24 @@ export default function Home() {
     if (loading) return;
     if (!user) {
       router.push('/login');
-    } else if (profile?.must_change_password) {
-      router.push('/force-change-password');
-    } else if (profile?.role === 'admin') {
+      return;
+    }
+
+    // 비밀번호 변경 필요 여부 체크 (admin/editor 제외)
+    if (profile?.must_change_password && profile?.role !== 'admin' && profile?.role !== 'editor') {
+      const skipCount = profile?.password_skip_count || 0;
+      const skipDone = typeof window !== 'undefined' && sessionStorage.getItem('pw_skip_done');
+
+      // 3회 초과 건너뛰기: 강제 변경
+      // 아직 스킵하지 않은 경우: 안내 표시
+      if (skipCount >= 3 || !skipDone) {
+        router.push('/force-change-password');
+        return;
+      }
+    }
+
+    // 역할별 홈 라우팅
+    if (profile?.role === 'admin' || profile?.role === 'editor') {
       router.push('/admin/dashboard');
     } else {
       router.push('/my');

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase-server';
-import { requireAdmin } from '@/lib/auth-guard';
+import { requireAdminOnly } from '@/lib/auth-guard';
 
 /**
  * 시트 컬럼 구조 (2026.04 기준):
@@ -188,7 +188,7 @@ function parseCSVRows(csvText: string): ParsedRow[] {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireAdminOnly(request);
   if (auth instanceof NextResponse) return auth;
 
   const formData = await request.formData();

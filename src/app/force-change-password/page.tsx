@@ -219,11 +219,19 @@ export default function ForceChangePasswordPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">새 비밀번호</label>
+                <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 mb-1">새 비밀번호</label>
                 <input
+                  id="new-password"
+                  name="new-password"
                   type="password"
+                  autoComplete="new-password"
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  onChange={(e) => { setNewPassword(e.target.value); e.target.setCustomValidity(''); }}
+                  onInvalid={(e) => {
+                    const input = e.target as HTMLInputElement;
+                    if (input.validity.valueMissing) input.setCustomValidity('새 비밀번호를 입력해주세요.');
+                    else if (input.validity.tooShort) input.setCustomValidity('비밀번호는 6자 이상이어야 합니다.');
+                  }}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   placeholder="6자 이상 입력"
                   required
@@ -232,11 +240,19 @@ export default function ForceChangePasswordPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호 확인</label>
+                <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-1">비밀번호 확인</label>
                 <input
+                  id="confirm-password"
+                  name="confirm-password"
                   type="password"
+                  autoComplete="new-password"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => { setConfirmPassword(e.target.value); e.target.setCustomValidity(''); }}
+                  onInvalid={(e) => {
+                    const input = e.target as HTMLInputElement;
+                    if (input.validity.valueMissing) input.setCustomValidity('비밀번호를 다시 입력해주세요.');
+                    else if (input.validity.tooShort) input.setCustomValidity('비밀번호는 6자 이상이어야 합니다.');
+                  }}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   placeholder="다시 입력"
                   required
@@ -245,7 +261,7 @@ export default function ForceChangePasswordPage() {
               </div>
 
               {error && (
-                <p className="text-red-500 text-sm">{error}</p>
+                <p className="text-red-500 text-sm" role="alert">{error}</p>
               )}
 
               <button

@@ -68,7 +68,8 @@ export default function LoginPage() {
               type="text"
               autoComplete="name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => { setName(e.target.value); e.target.setCustomValidity(''); }}
+              onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('이름을 입력해주세요.')}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               placeholder="홍길동"
               required
@@ -80,10 +81,11 @@ export default function LoginPage() {
             <input
               id="login-email"
               name="email"
-              type="email"
+              type="text"
               autoComplete="email"
               value={id}
-              onChange={(e) => setId(e.target.value)}
+              onChange={(e) => { setId(e.target.value); e.target.setCustomValidity(''); }}
+              onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('이메일 또는 아이디를 입력해주세요.')}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               placeholder="이메일 또는 아이디"
               required
@@ -98,7 +100,8 @@ export default function LoginPage() {
               type="password"
               autoComplete="current-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); e.target.setCustomValidity(''); }}
+              onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('비밀번호를 입력해주세요.')}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               placeholder="비밀번호 입력"
               required
@@ -106,7 +109,7 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <p className="text-red-500 text-sm">{error}</p>
+            <p className="text-red-500 text-sm" role="alert">{error}</p>
           )}
 
           <button

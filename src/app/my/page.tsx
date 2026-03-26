@@ -101,6 +101,8 @@ interface MonthCard {
   optimal: number;
   inbl: number;
   branchCount: number;
+  branchIds: Set<string>; // 담당 지점 ID 집합 (변경 감지용)
+  hasChange?: boolean; // 전월 대비 지점 변경 여부
 }
 
 export default function FreelancerPage() {
@@ -133,7 +135,7 @@ export default function FreelancerPage() {
     const [myRes, allMonthsRes] = await Promise.all([
       supabase
         .from('assignments')
-        .select('month, main_writer_id, sub_writer_id, optimal_writer_id, inbl_writer_id, main_quantity, sub_quantity, optimal_quantity, inbl_quantity')
+        .select('month, branch_id, main_writer_id, sub_writer_id, optimal_writer_id, inbl_writer_id, main_quantity, sub_quantity, optimal_quantity, inbl_quantity')
         .or(`main_writer_id.eq.${targetUserId},sub_writer_id.eq.${targetUserId},optimal_writer_id.eq.${targetUserId},inbl_writer_id.eq.${targetUserId}`),
       // 시스템에 존재하는 모든 월 (다른 작가 배정 포함)
       supabase.from('assignments').select('month'),
@@ -150,7 +152,7 @@ export default function FreelancerPage() {
 
     // 월별 집계
     const monthMap = new Map<string, MonthCard>();
-    const emptyCard = (month: string): MonthCard => ({ month, total: 0, writing: 0, review: 0, sub: 0, optimal: 0, inbl: 0, branchCount: 0 });
+    const emptyCard = (month: string): MonthCard => ({ month, total: 0, writing: 0, review: 0, sub: 0, optimal: 0, inbl: 0, branchCount: 0, branchIds: new Set() });
 
     for (const a of allAssignments) {
       if (!monthMap.has(a.month)) monthMap.set(a.month, emptyCard(a.month));
@@ -165,7 +167,7 @@ export default function FreelancerPage() {
       if (a.sub_writer_id === targetUserId) { card.sub += a.sub_quantity; counted = true; }
       if (a.optimal_writer_id === targetUserId) { card.optimal += a.optimal_quantity; counted = true; }
       if (a.inbl_writer_id === targetUserId) { card.inbl += a.inbl_quantity; counted = true; }
-      if (counted) card.branchCount++;
+      if (counted) { card.branchCount++; card.branchIds.add(a.branch_id); }
     }
 
     for (const card of monthMap.values()) {
@@ -195,7 +197,23 @@ export default function FreelancerPage() {
       }
     }
 
-    const cards = Array.from(monthMap.values()).sort((a, b) => b.month.localeCompare(a.month));
+    // 전월 대비 지점 변경 여부 계산
+    const sortedEntries = Array.from(monthMap.values()).sort((a, b) => a.month.localeCompare(b.month));
+    for (let i = 1; i < sortedEntries.length; i++) {
+      const prev = sortedEntries[i - 1];
+      const curr = sortedEntries[i];
+      if (prev.branchIds.size > 0 && curr.branchIds.size > 0) {
+        // 지점 집합이 다르면 변경 표시
+        const same = prev.branchIds.size === curr.branchIds.size &&
+          [...curr.branchIds].every(id => prev.branchIds.has(id));
+        if (!same) curr.hasChange = true;
+      } else if (prev.branchIds.size > 0 && curr.branchIds.size === 0) {
+        // 이전엔 있었는데 이번엔 없음 → 변경
+        curr.hasChange = true;
+      }
+    }
+
+    const cards = sortedEntries.sort((a, b) => b.month.localeCompare(a.month));
     setMonthCards(cards);
     setMonthCardsLoading(false);
   }, [targetUserId]);
@@ -486,6 +504,12 @@ export default function FreelancerPage() {
                   </p>
                   <p className="text-[10px] text-gray-400 mb-2">
                     {isEmpty ? '배정 없음' : `${card.branchCount}개 지점`}
+                    {card.hasChange && !isEmpty && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded font-semibold">변경</span>
+                    )}
+                    {card.hasChange && isEmpty && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-red-100 text-red-500 border border-red-200 rounded font-semibold">중단</span>
+                    )}
                   </p>
                   <div className="flex flex-wrap gap-1">
                     {roles.map(r => (

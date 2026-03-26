@@ -61,6 +61,13 @@ const ROLE_PILL: Record<string, string> = {
   '최적배포': 'bg-purple-50 text-purple-700 border-purple-200',
   '인블': 'bg-amber-50 text-amber-700 border-amber-200',
 };
+const PARTNER_COLORS = [
+  { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', dot: 'bg-rose-400' },
+  { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-400' },
+  { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-400' },
+  { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', dot: 'bg-sky-400' },
+  { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', dot: 'bg-violet-400' },
+];
 const catColors: Record<string, string> = {
   '피부과': 'bg-pink-50 text-pink-700 border-pink-200',
   '치과': 'bg-sky-50 text-sky-700 border-sky-200',
@@ -290,13 +297,30 @@ export default function FreelancerPage() {
     curSummary.inbl > 0 ? { label: '인블', qty: curSummary.inbl } : null,
   ].filter(Boolean) as { label: string; qty: number }[];
 
-  // 파트너 표시 텍스트
+  // 파트너별 색상 매핑 (이름 가나다순으로 팔레트 순환 배정)
+  const partnerColorMap = useMemo(() => {
+    const names = [...new Set(myAssignments.map(a => a.partnerName).filter(Boolean))].sort();
+    const map: Record<string, typeof PARTNER_COLORS[0]> = {};
+    names.forEach((name, i) => { map[name!] = PARTNER_COLORS[i % PARTNER_COLORS.length]; });
+    return map;
+  }, [myAssignments]);
+
+  // 파트너 표시 (색상 구분 적용)
   const renderPartner = (a: MyAssignment) => {
     if (!a.partnerName || !a.partnerRole) return <span className="text-gray-300">-</span>;
+    const color = partnerColorMap[a.partnerName];
+    if (!color) {
+      return (
+        <span className="text-xs">
+          <span className="text-gray-400">{a.partnerRole}</span>{' '}
+          <span className="font-medium text-gray-700">{a.partnerName}</span>
+        </span>
+      );
+    }
     return (
-      <span className="text-xs">
-        <span className="text-gray-400">{a.partnerRole}</span>{' '}
-        <span className="font-medium text-gray-700">{a.partnerName}</span>
+      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${color.bg} ${color.text} ${color.border}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />
+        {a.partnerName}
       </span>
     );
   };
@@ -493,21 +517,29 @@ export default function FreelancerPage() {
                       {mainPartners.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-blue-600 font-semibold shrink-0">담당 사수</span>
-                          {mainPartners.map(p => (
-                            <span key={p.name} className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-medium">
-                              {p.name} <span className="text-blue-400">{p.count}곳(원고 {p.qty}건)</span>
-                            </span>
-                          ))}
+                          {mainPartners.map(p => {
+                            const color = partnerColorMap[p.name];
+                            return (
+                              <span key={p.name} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border font-medium ${color ? `${color.bg} ${color.text} ${color.border}` : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                                {color && <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />}
+                                {p.name} <span className={color ? 'opacity-60' : 'text-blue-400'}>{p.count}곳(원고 {p.qty}건)</span>
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
                       {subPartners.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-green-600 font-semibold shrink-0">담당 부사수</span>
-                          {subPartners.map(p => (
-                            <span key={p.name} className="px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded font-medium">
-                              {p.name} <span className="text-green-400">{p.count}곳(원고 {p.qty}건)</span>
-                            </span>
-                          ))}
+                          {subPartners.map(p => {
+                            const color = partnerColorMap[p.name];
+                            return (
+                              <span key={p.name} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border font-medium ${color ? `${color.bg} ${color.text} ${color.border}` : 'bg-green-50 text-green-700 border-green-200'}`}>
+                                {color && <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />}
+                                {p.name} <span className={color ? 'opacity-60' : 'text-green-400'}>{p.count}곳(원고 {p.qty}건)</span>
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
                       {partnerSummary.bothCount > 0 && (
@@ -626,11 +658,7 @@ export default function FreelancerPage() {
                             </span>
                           ))}
                         </div>
-                        {a.partnerName && a.partnerRole && (
-                          <span className="text-xs text-gray-500">
-                            <span className="text-gray-400">{a.partnerRole}</span> {a.partnerName}
-                          </span>
-                        )}
+                        {a.partnerName && a.partnerRole && renderPartner(a)}
                       </div>
                     </div>
                   ))}

@@ -9,8 +9,8 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "스마트브랜딩 업무분장",
-  description: "블로그 마케팅 업무 배정 관리 시스템",
+  title: "스마트브랜딩 업무 관리",
+  description: "스마트브랜딩 업무 관리 시스템",
 };
 
 export default function RootLayout({

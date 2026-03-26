@@ -89,7 +89,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
       <div className="p-6 border-b border-gray-200 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-gray-900">스마트브랜딩</h1>
-          <p className="text-xs text-gray-500 mt-1">업무분장 관리</p>
+          <p className="text-xs text-gray-500 mt-1">업무 관리</p>
         </div>
         {onClose && (
           <button

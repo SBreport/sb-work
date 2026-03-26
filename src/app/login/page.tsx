@@ -56,7 +56,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-6 sm:p-8">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900">스마트브랜딩</h1>
-          <p className="text-gray-500 mt-2">업무분장 관리 시스템</p>
+          <p className="text-gray-500 mt-2">업무 관리 시스템</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -85,9 +85,9 @@ export default function LoginPage() {
               autoComplete="email"
               value={id}
               onChange={(e) => { setId(e.target.value); e.target.setCustomValidity(''); }}
-              onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('이메일 또는 아이디를 입력해주세요.')}
+              onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('노션 이메일을 입력해주세요.')}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              placeholder="이메일 또는 아이디"
+              placeholder="노션 이메일을 입력해주세요"
               required
             />
           </div>

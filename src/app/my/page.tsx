@@ -197,23 +197,21 @@ export default function FreelancerPage() {
       }
     }
 
-    // 전월 대비 지점 변경 여부 계산
-    const sortedEntries = Array.from(monthMap.values()).sort((a, b) => a.month.localeCompare(b.month));
-    for (let i = 1; i < sortedEntries.length; i++) {
-      const prev = sortedEntries[i - 1];
-      const curr = sortedEntries[i];
-      if (prev.branchIds.size > 0 && curr.branchIds.size > 0) {
-        // 지점 집합이 다르면 변경 표시
-        const same = prev.branchIds.size === curr.branchIds.size &&
-          [...curr.branchIds].every(id => prev.branchIds.has(id));
-        if (!same) curr.hasChange = true;
-      } else if (prev.branchIds.size > 0 && curr.branchIds.size === 0) {
-        // 이전엔 있었는데 이번엔 없음 → 변경
-        curr.hasChange = true;
+    // 다음 달 카드에만 지점 변경/중단 표시 (이번달 → 다음달 비교)
+    const nextMonth = getAdjacentMonth(currentMonth, 1);
+    const curCard = monthMap.get(currentMonth);
+    const nxtCard = monthMap.get(nextMonth);
+    if (curCard && nxtCard) {
+      if (curCard.branchIds.size > 0 && nxtCard.branchIds.size > 0) {
+        const same = curCard.branchIds.size === nxtCard.branchIds.size &&
+          [...nxtCard.branchIds].every(id => curCard.branchIds.has(id));
+        if (!same) nxtCard.hasChange = true;
+      } else if (curCard.branchIds.size > 0 && nxtCard.branchIds.size === 0) {
+        nxtCard.hasChange = true;
       }
     }
 
-    const cards = sortedEntries.sort((a, b) => b.month.localeCompare(a.month));
+    const cards = Array.from(monthMap.values()).sort((a, b) => b.month.localeCompare(a.month));
     setMonthCards(cards);
     setMonthCardsLoading(false);
   }, [targetUserId]);

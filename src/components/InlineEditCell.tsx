@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 
 interface InlineEditCellProps {
   value: string | number;
@@ -12,7 +12,7 @@ interface InlineEditCellProps {
   min?: number;
 }
 
-export default function InlineEditCell({
+export default memo(function InlineEditCell({
   value,
   type = 'text',
   onSave,
@@ -81,4 +81,4 @@ export default function InlineEditCell({
       {display}
     </span>
   );
-}
+})

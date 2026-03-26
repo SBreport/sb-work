@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 
 interface Option {
   value: string;
@@ -16,7 +16,7 @@ interface InlineSelectCellProps {
   renderDisplay?: (value: string, label: string) => React.ReactNode;
 }
 
-export default function InlineSelectCell({
+export default memo(function InlineSelectCell({
   value,
   options,
   onSave,
@@ -73,4 +73,4 @@ export default function InlineSelectCell({
       {renderDisplay ? renderDisplay(value, displayLabel) : displayLabel}
     </span>
   );
-}
+})

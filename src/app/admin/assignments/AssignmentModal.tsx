@@ -8,7 +8,7 @@ import { X } from 'lucide-react';
 interface Props {
   assignment: Assignment | null;
   month: string;
-  writers: User[];
+  writers: Pick<User, 'id' | 'name'>[];
   onClose: () => void;
   onSave: () => void;
 }

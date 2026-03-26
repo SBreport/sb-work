@@ -40,7 +40,7 @@ export default function AssignmentsPage() {
   const { user } = useAuth();
   const [month, setMonth] = useState(getCurrentMonth());
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [writers, setWriters] = useState<User[]>([]);
+  const [writers, setWriters] = useState<Pick<User, 'id' | 'name'>[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -53,11 +53,11 @@ export default function AssignmentsPage() {
       .from('assignments')
       .select(`
         *,
-        branch:branches(*),
-        main_writer:profiles!assignments_main_writer_id_fkey(*),
-        sub_writer:profiles!assignments_sub_writer_id_fkey(*),
-        optimal_writer:profiles!assignments_optimal_writer_id_fkey(*),
-        inbl_writer:profiles!assignments_inbl_writer_id_fkey(*)
+        branch:branches(id, name, category, product_type, status),
+        main_writer:profiles!assignments_main_writer_id_fkey(id, name),
+        sub_writer:profiles!assignments_sub_writer_id_fkey(id, name),
+        optimal_writer:profiles!assignments_optimal_writer_id_fkey(id, name),
+        inbl_writer:profiles!assignments_inbl_writer_id_fkey(id, name)
       `)
       .eq('month', month)
       .order('renewal_day', { ascending: true });
@@ -68,7 +68,7 @@ export default function AssignmentsPage() {
   const fetchWriters = useCallback(async () => {
     const { data } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, name')
       .eq('is_active', true)
       .order('name');
     setWriters(data || []);

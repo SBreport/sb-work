@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -48,9 +48,11 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const [writers, setWriters] = useState<WriterOption[]>([]);
   const [showWriterSelect, setShowWriterSelect] = useState(false);
 
-  // 관리자일 때 프리랜서 목록 로드
+  // 관리자일 때 프리랜서 목록 로드 (한 번만)
+  const writersFetched = useRef(false);
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin || writersFetched.current) return;
+    writersFetched.current = true;
     supabase
       .from('profiles')
       .select('id, name')

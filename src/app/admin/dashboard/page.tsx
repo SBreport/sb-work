@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import MonthSelector from '@/components/MonthSelector';
 import MonthlyTrendChart from '@/components/MonthlyTrendChart';
@@ -29,9 +29,9 @@ interface WriterStats {
   prevTotal: number;
 }
 
-function calcWriterStats(assignments: Assignment[]): Record<string, WriterStats> {
+function calcWriterStats(assignments: Partial<Assignment>[]): Record<string, WriterStats> {
   return assignments.reduce<Record<string, WriterStats>>((acc, a) => {
-    const addWriter = (id: string | null, nameObj: unknown, nameFallback: string | null | undefined, role: 'main' | 'sub' | 'optimal' | 'inbl', qty: number) => {
+    const addWriter = (id: string | null | undefined, nameObj: unknown, nameFallback: string | null | undefined, role: 'main' | 'sub' | 'optimal' | 'inbl', qty: number) => {
       const name = (nameObj as { name: string } | undefined)?.name || nameFallback;
       if (!name) return;
       const key = id || `name:${name}`;
@@ -41,10 +41,10 @@ function calcWriterStats(assignments: Assignment[]): Record<string, WriterStats>
       if (role === 'optimal') acc[key].optimalQty += qty;
       if (role === 'inbl') acc[key].inblQty += qty;
     };
-    addWriter(a.main_writer_id, a.main_writer, a.main_writer_name, 'main', a.main_quantity);
-    addWriter(a.sub_writer_id, a.sub_writer, a.sub_writer_name, 'sub', a.sub_quantity);
-    addWriter(a.optimal_writer_id, a.optimal_writer, a.optimal_writer_name, 'optimal', a.optimal_quantity);
-    addWriter(a.inbl_writer_id, a.inbl_writer, a.inbl_writer_name, 'inbl', a.inbl_quantity);
+    addWriter(a.main_writer_id, a.main_writer, a.main_writer_name, 'main', a.main_quantity || 0);
+    addWriter(a.sub_writer_id, a.sub_writer, a.sub_writer_name, 'sub', a.sub_quantity || 0);
+    addWriter(a.optimal_writer_id, a.optimal_writer, a.optimal_writer_name, 'optimal', a.optimal_quantity || 0);
+    addWriter(a.inbl_writer_id, a.inbl_writer, a.inbl_writer_name, 'inbl', a.inbl_quantity || 0);
     return acc;
   }, {});
 }
@@ -60,15 +60,21 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
 
 export default function DashboardPage() {
   const [month, setMonth] = useState(getCurrentMonth());
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [prevAssignments, setPrevAssignments] = useState<Assignment[]>([]);
+  // 대시보드는 note/branch_id 등을 사용하지 않으므로 Partial 타입 허용
+  const [assignments, setAssignments] = useState<Partial<Assignment>[]>([]);
+  const [prevAssignments, setPrevAssignments] = useState<Partial<Assignment>[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     const prevMonth = getAdjacentMonth(month, -1);
 
-    const selectQuery = `*, branch:branches(*),
+    const selectQuery = `id, month, status, renewal_day,
+      main_writer_id, main_writer_name, main_quantity,
+      sub_writer_id, sub_writer_name, sub_quantity,
+      optimal_writer_id, optimal_writer_name, optimal_quantity,
+      inbl_writer_id, inbl_writer_name, inbl_quantity,
+      branch:branches(id, name, category, product_type),
       main_writer:profiles!assignments_main_writer_id_fkey(name),
       sub_writer:profiles!assignments_sub_writer_id_fkey(name),
       optimal_writer:profiles!assignments_optimal_writer_id_fkey(name),
@@ -79,36 +85,41 @@ export default function DashboardPage() {
       supabase.from('assignments').select(selectQuery).eq('month', prevMonth),
     ]);
 
-    setAssignments(assignRes.data || []);
-    setPrevAssignments(prevRes.data || []);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setAssignments((assignRes.data as any) || []);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setPrevAssignments((prevRes.data as any) || []);
     setLoading(false);
   }, [month]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const stats = calcWriterStats(assignments);
-  const prevStats = calcWriterStats(prevAssignments);
-  for (const [key, s] of Object.entries(stats)) {
-    const prev = prevStats[key];
-    s.prevTotal = prev ? prev.mainQty + prev.subQty + prev.optimalQty + prev.inblQty : 0;
-  }
+  const stats = useMemo(() => {
+    const s = calcWriterStats(assignments);
+    const prevS = calcWriterStats(prevAssignments);
+    for (const [key, stat] of Object.entries(s)) {
+      const prev = prevS[key];
+      stat.prevTotal = prev ? prev.mainQty + prev.subQty + prev.optimalQty + prev.inblQty : 0;
+    }
+    return s;
+  }, [assignments, prevAssignments]);
 
-  const totalPosts = assignments.reduce((sum, a) => sum + a.main_quantity + a.sub_quantity + a.optimal_quantity + a.inbl_quantity, 0);
-  const prevTotalPosts = prevAssignments.reduce((sum, a) => sum + a.main_quantity + a.sub_quantity + a.optimal_quantity + a.inbl_quantity, 0);
-  const postsDiff = totalPosts - prevTotalPosts;
-
-  const statusCounts = assignments.reduce<Record<string, number>>((acc, a) => {
-    acc[a.status] = (acc[a.status] || 0) + 1;
-    return acc;
-  }, {});
-
-  const unassigned = assignments.filter(a => !a.main_writer_id && !a.main_writer_name);
-
-  const sortedWriters = Object.entries(stats).sort((a, b) => {
-    const aTotal = a[1].mainQty + a[1].subQty + a[1].optimalQty + a[1].inblQty;
-    const bTotal = b[1].mainQty + b[1].subQty + b[1].optimalQty + b[1].inblQty;
-    return bTotal - aTotal;
-  });
+  const { totalPosts, prevTotalPosts, postsDiff, statusCounts, unassigned, sortedWriters } = useMemo(() => {
+    const total = assignments.reduce((sum, a) => sum + (a.main_quantity || 0) + (a.sub_quantity || 0) + (a.optimal_quantity || 0) + (a.inbl_quantity || 0), 0);
+    const prevTotal = prevAssignments.reduce((sum, a) => sum + (a.main_quantity || 0) + (a.sub_quantity || 0) + (a.optimal_quantity || 0) + (a.inbl_quantity || 0), 0);
+    const counts = assignments.reduce<Record<string, number>>((acc, a) => {
+      const status = a.status || 'active';
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
+    const unas = assignments.filter(a => !a.main_writer_id && !a.main_writer_name);
+    const sorted = Object.entries(stats).sort((a, b) => {
+      const aT = a[1].mainQty + a[1].subQty + a[1].optimalQty + a[1].inblQty;
+      const bT = b[1].mainQty + b[1].subQty + b[1].optimalQty + b[1].inblQty;
+      return bT - aT;
+    });
+    return { totalPosts: total, prevTotalPosts: prevTotal, postsDiff: total - prevTotal, statusCounts: counts, unassigned: unas, sortedWriters: sorted };
+  }, [assignments, prevAssignments, stats]);
 
   return (
     <div className="p-4 max-w-[1200px]">

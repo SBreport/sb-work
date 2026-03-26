@@ -43,6 +43,7 @@ interface MyAssignment extends Assignment {
   totalQty: number;
   partnerName: string | null;
   partnerRole: string | null; // '사수' or '부사수'
+  isNew: boolean; // 전월에 없던 신규 지점
 }
 
 type SortKey = 'renewal_day' | 'category' | 'name' | 'role' | 'qty';
@@ -103,6 +104,7 @@ export default function FreelancerPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [prevSummary, setPrevSummary] = useState<MonthSummary | null>(null);
   const [nextSummary, setNextSummary] = useState<MonthSummary | null>(null);
+  const [prevBranchIds, setPrevBranchIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>('role');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -178,6 +180,19 @@ export default function FreelancerPage() {
     setAssignments(curRes.data || []);
     setPrevSummary(prevRes.data ? calcSummary(prevRes.data, targetUserId) : null);
     setNextSummary(nextRes.data ? calcSummary(nextRes.data, targetUserId) : null);
+    // 전월에 내가 담당했던 지점 ID 수집 (신규 지점 표시용)
+    if (prevRes.data) {
+      const ids = new Set<string>();
+      for (const a of prevRes.data) {
+        if (a.main_writer_id === targetUserId || a.sub_writer_id === targetUserId ||
+            a.optimal_writer_id === targetUserId || a.inbl_writer_id === targetUserId) {
+          ids.add(a.branch_id);
+        }
+      }
+      setPrevBranchIds(ids);
+    } else {
+      setPrevBranchIds(new Set());
+    }
     setLoading(false);
   }, [targetUserId, month]);
 
@@ -208,9 +223,11 @@ export default function FreelancerPage() {
         if (a.inbl_writer_id === uid) roles.push({ label: '인블', qty: a.inbl_quantity });
 
         const totalQty = roles.reduce((s, r) => s + r.qty, 0);
-        return { ...a, roles, totalQty, partnerName, partnerRole };
+        // 전월에 내가 담당하지 않았던 지점이면 '신규'
+        const isNew = prevBranchIds.size > 0 && !prevBranchIds.has(a.branch_id);
+        return { ...a, roles, totalQty, partnerName, partnerRole, isNew };
       });
-  }, [assignments, uid]);
+  }, [assignments, uid, prevBranchIds]);
 
   const sortedAssignments = useMemo(() => {
     const sorted = [...myAssignments];
@@ -601,7 +618,10 @@ export default function FreelancerPage() {
                             {clean(a.branch?.category) || '-'}
                           </span>
                         </td>
-                        <td className="px-2 py-1.5 font-medium text-gray-900 whitespace-nowrap">{a.branch?.name || '-'}</td>
+                        <td className="px-2 py-1.5 font-medium text-gray-900 whitespace-nowrap">
+                          {a.branch?.name || '-'}
+                          {a.isNew && <span className="ml-1.5 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded text-[10px] font-semibold">신규</span>}
+                        </td>
                         <td className="px-2 py-1.5 text-center">
                           <div className="inline-flex gap-0.5">
                             {a.roles.map(r => (
@@ -633,7 +653,10 @@ export default function FreelancerPage() {
                       {/* 상단: 지점명 + 포스팅 수 */}
                       <div className="flex items-start justify-between mb-2">
                         <div>
-                          <p className="font-semibold text-gray-900 text-sm">{a.branch?.name || '-'}</p>
+                          <p className="font-semibold text-gray-900 text-sm">
+                            {a.branch?.name || '-'}
+                            {a.isNew && <span className="ml-1.5 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded text-[10px] font-semibold align-middle">신규</span>}
+                          </p>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className={`px-1.5 py-0.5 rounded border text-[11px] ${catColors[clean(a.branch?.category)] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
                               {clean(a.branch?.category)}

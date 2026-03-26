@@ -9,13 +9,28 @@ import { AlertTriangle } from 'lucide-react';
 type Step = 'welcome' | 'change' | 'skip-warning';
 
 export default function ForceChangePasswordPage() {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
   const router = useRouter();
   const [step, setStep] = useState<Step>('welcome');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // 인증 로딩 중
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-gray-400">로딩 중...</p>
+      </div>
+    );
+  }
+
+  // 비로그인 사용자는 로그인 페이지로
+  if (!user) {
+    router.push('/login');
+    return null;
+  }
 
   // 이미 비밀번호 변경 완료된 유저는 홈으로
   if (profile && !profile.must_change_password) {

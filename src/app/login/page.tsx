@@ -4,20 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 
-// 짧은 ID → 실제 이메일 매핑
-const ID_ALIASES: Record<string, string> = {
-  'admin': 'jogons.b@gmail.com',
-};
-
-function resolveEmail(input: string): string {
-  const lower = input.trim().toLowerCase();
-  // 별칭이 있으면 매핑된 이메일 반환
-  if (ID_ALIASES[lower]) return ID_ALIASES[lower];
-  // @가 없으면 @gmail.com 자동 추가
-  if (!lower.includes('@')) return `${lower}@gmail.com`;
-  return lower;
-}
-
 export default function LoginPage() {
   const [name, setName] = useState('');
   const [id, setId] = useState('');
@@ -32,31 +18,29 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
-    const email = resolveEmail(id);
+    // 서버에서 별칭 해석 + 이름/이메일 검증을 모두 처리
+    let email: string;
+    try {
+      const verifyRes = await fetch('/api/verify-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), id: id.trim() }),
+      });
 
-    // 1단계: 이름 + 이메일 매칭 검증 (관리자 별칭은 검증 스킵)
-    if (!ID_ALIASES[id.trim().toLowerCase()]) {
-      try {
-        const verifyRes = await fetch('/api/verify-login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), email }),
-        });
-
-        if (!verifyRes.ok) {
-          const data = await verifyRes.json();
-          setError(data.error || '이름 또는 이메일이 올바르지 않습니다.');
-          setLoading(false);
-          return;
-        }
-      } catch {
-        setError('서버 연결에 실패했습니다.');
+      const data = await verifyRes.json();
+      if (!verifyRes.ok) {
+        setError(data.error || '이름 또는 이메일이 올바르지 않습니다.');
         setLoading(false);
         return;
       }
+      email = data.email;
+    } catch {
+      setError('서버 연결에 실패했습니다.');
+      setLoading(false);
+      return;
     }
 
-    // 2단계: Supabase Auth 로그인
+    // Supabase Auth 로그인
     const { error } = await signIn(email, password);
     if (error) {
       setError('비밀번호가 올바르지 않습니다.');
@@ -77,9 +61,12 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">이름</label>
+            <label htmlFor="login-name" className="block text-sm font-medium text-gray-700 mb-1">이름</label>
             <input
+              id="login-name"
+              name="name"
               type="text"
+              autoComplete="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
@@ -89,9 +76,12 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+            <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
             <input
-              type="text"
+              id="login-email"
+              name="email"
+              type="email"
+              autoComplete="email"
               value={id}
               onChange={(e) => setId(e.target.value)}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
@@ -101,13 +91,16 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
             <input
+              id="login-password"
+              name="password"
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              placeholder="초기 비밀번호: 010010"
+              placeholder="비밀번호 입력"
               required
             />
           </div>

@@ -1,20 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase-server';
 
-// 이름 + 이메일 매칭 검증
+// 서버사이드 별칭 해석 (환경변수: ADMIN_ALIASES=admin:email1,manager:email2)
+function getAliases(): Record<string, string> {
+  const raw = process.env.ADMIN_ALIASES || '';
+  const aliases: Record<string, string> = {};
+  for (const pair of raw.split(',')) {
+    const [key, value] = pair.split(':');
+    if (key && value) aliases[key.trim().toLowerCase()] = value.trim().toLowerCase();
+  }
+  return aliases;
+}
+
+function resolveEmail(input: string): string {
+  const lower = input.trim().toLowerCase();
+  const aliases = getAliases();
+  if (aliases[lower]) return aliases[lower];
+  if (!lower.includes('@')) return `${lower}@gmail.com`;
+  return lower;
+}
+
+// 이름 + ID(이메일/별칭) 매칭 검증
 export async function POST(request: NextRequest) {
   const supabase = createServerSupabase();
-  const { name, email } = await request.json();
+  const { name, id, email: legacyEmail } = await request.json();
 
-  if (!name || !email) {
-    return NextResponse.json({ error: '이름과 이메일을 입력해주세요.' }, { status: 400 });
+  // id 필드 우선, 하위 호환으로 email 필드도 지원
+  const rawId = id || '';
+  const email = rawId ? resolveEmail(rawId) : (legacyEmail || '').toLowerCase().trim();
+
+  if (!email) {
+    return NextResponse.json({ error: '이메일을 입력해주세요.' }, { status: 400 });
+  }
+
+  // 관리자 별칭인 경우 이름 검증 스킵
+  const aliases = getAliases();
+  const isAlias = rawId && aliases[rawId.trim().toLowerCase()];
+
+  if (isAlias) {
+    return NextResponse.json({ success: true, email });
+  }
+
+  if (!name) {
+    return NextResponse.json({ error: '이름을 입력해주세요.' }, { status: 400 });
   }
 
   // profiles 테이블에서 이름+이메일 매칭 확인
   const { data: profile, error } = await supabase
     .from('profiles')
     .select('id, name, email, is_active')
-    .eq('email', email.toLowerCase().trim())
+    .eq('email', email)
     .eq('name', name.trim())
     .single();
 

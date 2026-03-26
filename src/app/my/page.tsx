@@ -148,6 +148,29 @@ export default function FreelancerPage() {
       card.total = card.main + card.sub + card.optimal + card.inbl;
     }
 
+    // 가장 오래된 활동 월 ~ 현재 월 사이 빈 월도 0건 카드로 채움
+    const currentMonth = getCurrentMonth();
+    const allMonths = Array.from(monthMap.keys());
+    if (allMonths.length > 0) {
+      allMonths.push(currentMonth);
+      allMonths.sort();
+      const earliest = allMonths[0];
+      const latest = allMonths[allMonths.length - 1] > currentMonth ? allMonths[allMonths.length - 1] : currentMonth;
+
+      // earliest ~ latest 사이 모든 월 생성
+      const [ey, em] = earliest.split('-').map(Number);
+      const [ly, lm] = latest.split('-').map(Number);
+      let y = ey, m = em;
+      while (y < ly || (y === ly && m <= lm)) {
+        const key = `${y}-${String(m).padStart(2, '0')}`;
+        if (!monthMap.has(key)) {
+          monthMap.set(key, { month: key, total: 0, main: 0, sub: 0, optimal: 0, inbl: 0, branchCount: 0 });
+        }
+        m++;
+        if (m > 12) { m = 1; y++; }
+      }
+    }
+
     const cards = Array.from(monthMap.values()).sort((a, b) => b.month.localeCompare(a.month));
     setMonthCards(cards);
     setMonthCardsLoading(false);
@@ -407,6 +430,8 @@ export default function FreelancerPage() {
                 card.inbl > 0 ? { label: '인블', qty: card.inbl, color: 'text-amber-600' } : null,
               ].filter(Boolean) as { label: string; qty: number; color: string }[];
 
+              const isEmpty = card.total === 0;
+
               return (
                 <button
                   key={card.month}
@@ -414,23 +439,27 @@ export default function FreelancerPage() {
                   className={`relative text-left rounded-xl border-2 p-4 transition-all hover:shadow-md hover:scale-[1.02] active:scale-[0.98] ${
                     isCurrent
                       ? 'border-blue-400 bg-blue-50 shadow-sm'
-                      : 'border-gray-200 bg-white hover:border-blue-200'
+                      : isEmpty
+                        ? 'border-gray-100 bg-gray-50 hover:border-gray-300'
+                        : 'border-gray-200 bg-white hover:border-blue-200'
                   }`}
                 >
                   {/* 미확인 파란 점 */}
-                  {isUnseen && (
+                  {isUnseen && !isEmpty && (
                     <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse" />
                   )}
                   <div className="flex items-baseline justify-between mb-2">
-                    <span className={`text-lg font-bold ${isCurrent ? 'text-blue-700' : 'text-gray-900'}`}>
+                    <span className={`text-lg font-bold ${isCurrent ? 'text-blue-700' : isEmpty ? 'text-gray-400' : 'text-gray-900'}`}>
                       {Number(m)}월
                     </span>
                     <span className="text-[10px] text-gray-400">{y}</span>
                   </div>
-                  <p className={`text-2xl font-bold mb-1 ${isCurrent ? 'text-blue-600' : 'text-gray-800'}`}>
+                  <p className={`text-2xl font-bold mb-1 ${isCurrent ? 'text-blue-600' : isEmpty ? 'text-gray-300' : 'text-gray-800'}`}>
                     {card.total}<span className="text-xs font-normal text-gray-400 ml-0.5">건</span>
                   </p>
-                  <p className="text-[10px] text-gray-400 mb-2">{card.branchCount}개 지점</p>
+                  <p className="text-[10px] text-gray-400 mb-2">
+                    {isEmpty ? '배정 없음' : `${card.branchCount}개 지점`}
+                  </p>
                   <div className="flex flex-wrap gap-1">
                     {roles.map(r => (
                       <span key={r.label} className={`text-[10px] ${r.color}`}>

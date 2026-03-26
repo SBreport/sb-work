@@ -41,33 +41,26 @@ export default function ForceChangePasswordPage() {
   const skipCount = profile?.password_skip_count || 0;
   const canSkip = skipCount < 3;
 
-  const handleSkip = async () => {
+  const handleSkip = () => {
     if (!canSkip || !user) return;
-    setLoading(true);
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch('/api/password-skip', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-      });
+    // 즉시 이동 — 체감 속도 최우선
+    sessionStorage.setItem('pw_skip_done', 'true');
+    router.push('/');
+    router.refresh();
 
-      if (!res.ok) {
-        setLoading(false);
-        return;
+    // skip_count 증가는 백그라운드로 (UI 블로킹 없음)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.access_token) {
+        fetch('/api/password-skip', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        });
       }
-
-      // sessionStorage에 스킵 표시 → 이번 세션에서 다시 안내 안 보여줌
-      sessionStorage.setItem('pw_skip_done', 'true');
-      await refreshProfile();
-      router.push('/');
-      router.refresh();
-    } catch {
-      setLoading(false);
-    }
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

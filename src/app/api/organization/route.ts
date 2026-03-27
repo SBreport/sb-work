@@ -22,21 +22,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: teamsError.message }, { status: 500 });
   }
 
-  // 조직도에 표시할 프로필 조회
+  // 조직도에 표시할 프로필 조회 (DB에서 필터링)
   const { data: members, error: membersError } = await supabase
     .from('profiles')
-    .select('id, name, email, phone, role, position, mentor_role, sort_order, team_id, employee_type, is_active')
+    .select('id, name, email, phone, role, position, mentor_role, sort_order, team_id, employee_type, is_active, avatar_url')
+    .eq('is_active', true)
+    .neq('name', 'admin')
+    .or('team_id.not.is.null,employee_type.eq.internal,employee_type.eq.partner')
     .order('sort_order');
 
-  // 필터:
-  // 1) 시스템 관리자 계정(name='admin') 제외
-  // 2) is_active=false 제외 (퇴사 예정)
-  // 3) team_id가 있거나 employee_type이 internal/partner인 사람만
-  const filteredMembers = (members || []).filter(m =>
-    m.name !== 'admin' &&
-    m.is_active !== false &&
-    (m.team_id || m.employee_type === 'internal' || m.employee_type === 'partner')
-  );
+  const filteredMembers = members || [];
 
   if (membersError) {
     return NextResponse.json({ error: membersError.message }, { status: 500 });

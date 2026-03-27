@@ -98,19 +98,12 @@ export default function Sidebar({ onClose }: SidebarProps) {
       .then(({ data }) => setEmployees(data || []));
   }, [isAdmin]);
 
-  const handleViewAsFreelancer = (id: string) => {
-    setViewAs(id, 'freelancer');
+  const handleViewAs = (id: string, role: 'freelancer' | 'employee', redirectTo: string) => {
+    setViewAs(id, role);
     setShowFreelancerList(false);
-    setPreviewOpen(false);
-    router.push('/my');
-    onClose?.();
-  };
-
-  const handleViewAsEmployee = (id: string) => {
-    setViewAs(id, 'employee');
     setShowEmployeeList(false);
     setPreviewOpen(false);
-    router.push('/notices');
+    router.push(redirectTo);
     onClose?.();
   };
 
@@ -271,7 +264,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
                     {writers.map(w => (
                       <button
                         key={w.id}
-                        onClick={() => handleViewAsFreelancer(w.id)}
+                        onClick={() => handleViewAs(w.id, 'freelancer', '/my')}
                         className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors border-b border-gray-100 last:border-0"
                       >
                         {w.name}
@@ -298,7 +291,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
                     {employees.map(e => (
                       <button
                         key={e.id}
-                        onClick={() => handleViewAsEmployee(e.id)}
+                        onClick={() => handleViewAs(e.id, 'employee', '/notices')}
                         className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors border-b border-gray-100 last:border-0"
                       >
                         {e.name}

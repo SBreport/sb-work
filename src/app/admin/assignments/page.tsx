@@ -12,15 +12,8 @@ import InlineSelectCell from '@/components/InlineSelectCell';
 import AssignmentModal from './AssignmentModal';
 import type { Assignment, User, AssignmentStatus } from '@/types/database';
 import { Plus, Copy, Download, Trash2, History } from 'lucide-react';
-
-const STATUS_OPTIONS = [
-  { value: 'active', label: '활성' },
-  { value: 'new', label: '신규' },
-  { value: 'changed', label: '변경' },
-  { value: 'terminated', label: '해지' },
-  { value: 'ai', label: 'AI' },
-  { value: 'both', label: '동시' },
-];
+import { STATUS_OPTIONS } from '@/lib/constants';
+import { calcWriterStats, totalQty } from '@/lib/stats';
 
 interface LogEntry {
   id: string;
@@ -191,23 +184,7 @@ export default function AssignmentsPage() {
   const writerOptions = writers.map(w => ({ value: w.id, label: w.name }));
 
   // 담당자별 수량 집계
-  const writerSummary = assignments.reduce<Record<string, { name: string; mainQty: number; subQty: number; optimalQty: number; inblQty: number }>>((acc, a) => {
-    const addWriter = (id: string | null, nameObj: unknown, nameFallback: string | null | undefined, role: 'main' | 'sub' | 'optimal' | 'inbl', qty: number) => {
-      const name = (nameObj as { name?: string } | null)?.name || nameFallback;
-      if (!name) return;
-      const key = id || `name:${name}`;
-      if (!acc[key]) acc[key] = { name, mainQty: 0, subQty: 0, optimalQty: 0, inblQty: 0 };
-      if (role === 'main') acc[key].mainQty += qty;
-      if (role === 'sub') acc[key].subQty += qty;
-      if (role === 'optimal') acc[key].optimalQty += qty;
-      if (role === 'inbl') acc[key].inblQty += qty;
-    };
-    addWriter(a.main_writer_id, a.main_writer, a.main_writer_name, 'main', a.main_quantity);
-    addWriter(a.sub_writer_id, a.sub_writer, a.sub_writer_name, 'sub', a.sub_quantity);
-    addWriter(a.optimal_writer_id, a.optimal_writer, a.optimal_writer_name, 'optimal', a.optimal_quantity);
-    addWriter(a.inbl_writer_id, a.inbl_writer, a.inbl_writer_name, 'inbl', a.inbl_quantity);
-    return acc;
-  }, {});
+  const writerSummary = calcWriterStats(assignments);
 
   const getWriterDisplay = (writer: unknown, name: string | null | undefined, role: string) => {
     const writerName = (writer as { name?: string; id?: string } | null)?.name || name;
@@ -422,7 +399,7 @@ export default function AssignmentsPage() {
           <h3 className="text-xs font-semibold text-gray-700 mb-3">담당자별 수량 집계</h3>
           <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-2">
             {Object.entries(writerSummary)
-              .sort((a, b) => (b[1].mainQty + b[1].subQty + b[1].optimalQty + b[1].inblQty) - (a[1].mainQty + a[1].subQty + a[1].optimalQty + a[1].inblQty))
+              .sort((a, b) => totalQty(b[1]) - totalQty(a[1]))
               .map(([id, s]) => (
                 <div key={id} className="bg-gray-50 rounded-lg p-2.5">
                   <p className="font-medium text-gray-900 text-xs">{s.name}</p>
@@ -433,7 +410,7 @@ export default function AssignmentsPage() {
                     {s.inblQty > 0 && <span className="text-amber-600">인{s.inblQty}</span>}
                   </div>
                   <p className="text-xs font-semibold text-gray-600 mt-0.5">
-                    합 {s.mainQty + s.subQty + s.optimalQty + s.inblQty}
+                    합 {totalQty(s)}
                   </p>
                 </div>
               ))}

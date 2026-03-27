@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react';
 import { supabase } from './supabase';
 import type { User as AppUser } from '@/types/database';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
@@ -85,42 +85,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(({ data }) => setViewAsProfile(data));
   }, [viewAsId]);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error?.message ?? null };
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     setViewAsIdState(null);
     setViewAsRole(null);
     setViewAsProfile(null);
     await supabase.auth.signOut();
     setProfile(null);
-  };
+  }, []);
 
-  const setViewAs = (id: string | null, role: ViewAsRole = null) => {
+  const setViewAs = useCallback((id: string | null, role: ViewAsRole = null) => {
     if (profile?.role !== 'admin' && profile?.role !== 'editor') return;
     setViewAsIdState(id);
     setViewAsRole(id ? role : null);
-  };
+  }, [profile?.role]);
+
+  const value = useMemo(() => ({
+    user,
+    profile,
+    loading,
+    signIn,
+    signOut,
+    isAdmin: profile?.role === 'admin' || profile?.role === 'editor',
+    isEditor: profile?.role === 'editor',
+    isEmployee: profile?.role === 'employee',
+    refreshProfile,
+    viewAsId,
+    viewAsProfile,
+    viewAsRole,
+    setViewAs,
+    isViewingAs: !!viewAsId,
+  }), [user, profile, loading, signIn, signOut, refreshProfile, viewAsId, viewAsProfile, viewAsRole, setViewAs]);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      profile,
-      loading,
-      signIn,
-      signOut,
-      isAdmin: profile?.role === 'admin' || profile?.role === 'editor',
-      isEditor: profile?.role === 'editor',
-      isEmployee: profile?.role === 'employee',
-      refreshProfile,
-      viewAsId,
-      viewAsProfile,
-      viewAsRole,
-      setViewAs,
-      isViewingAs: !!viewAsId,
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

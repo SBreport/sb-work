@@ -8,45 +8,8 @@ import MonthlyTrendChart from '@/components/MonthlyTrendChart';
 import BranchAlerts from '@/components/BranchAlerts';
 import type { Assignment, AssignmentStatus } from '@/types/database';
 import { AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-
-interface WriterStats {
-  name: string;
-  mainQty: number;
-  subQty: number;
-  optimalQty: number;
-  inblQty: number;
-  branchCount: number;
-  prevTotal: number;
-}
-
-function calcWriterStats(assignments: Partial<Assignment>[]): Record<string, WriterStats> {
-  return assignments.reduce<Record<string, WriterStats>>((acc, a) => {
-    const addWriter = (id: string | null | undefined, nameObj: unknown, nameFallback: string | null | undefined, role: 'main' | 'sub' | 'optimal' | 'inbl', qty: number) => {
-      const name = (nameObj as { name: string } | undefined)?.name || nameFallback;
-      if (!name) return;
-      const key = id || `name:${name}`;
-      if (!acc[key]) acc[key] = { name, mainQty: 0, subQty: 0, optimalQty: 0, inblQty: 0, branchCount: 0, prevTotal: 0 };
-      if (role === 'main') { acc[key].mainQty += qty; acc[key].branchCount++; }
-      if (role === 'sub') acc[key].subQty += qty;
-      if (role === 'optimal') acc[key].optimalQty += qty;
-      if (role === 'inbl') acc[key].inblQty += qty;
-    };
-    addWriter(a.main_writer_id, a.main_writer, a.main_writer_name, 'main', a.main_quantity || 0);
-    addWriter(a.sub_writer_id, a.sub_writer, a.sub_writer_name, 'sub', a.sub_quantity || 0);
-    addWriter(a.optimal_writer_id, a.optimal_writer, a.optimal_writer_name, 'optimal', a.optimal_quantity || 0);
-    addWriter(a.inbl_writer_id, a.inbl_writer, a.inbl_writer_name, 'inbl', a.inbl_quantity || 0);
-    return acc;
-  }, {});
-}
-
-const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
-  active: { label: '활성', color: 'text-gray-700', bg: 'bg-gray-100' },
-  new: { label: '신규', color: 'text-green-700', bg: 'bg-green-100' },
-  changed: { label: '변경', color: 'text-yellow-700', bg: 'bg-yellow-100' },
-  terminated: { label: '해지', color: 'text-red-700', bg: 'bg-red-100' },
-  ai: { label: 'AI', color: 'text-purple-700', bg: 'bg-purple-100' },
-  both: { label: '동시', color: 'text-blue-700', bg: 'bg-blue-100' },
-};
+import { calcWriterStats, totalQty } from '@/lib/stats';
+import { ASSIGNMENT_STATUS_MAP } from '@/lib/constants';
 
 export default function DashboardView() {
   const [month, setMonth] = useState(getCurrentMonth());
@@ -88,7 +51,7 @@ export default function DashboardView() {
     const prevS = calcWriterStats(prevAssignments);
     for (const [key, stat] of Object.entries(s)) {
       const prev = prevS[key];
-      stat.prevTotal = prev ? prev.mainQty + prev.subQty + prev.optimalQty + prev.inblQty : 0;
+      stat.prevTotal = prev ? totalQty(prev) : 0;
     }
     return s;
   }, [assignments, prevAssignments]);
@@ -103,8 +66,8 @@ export default function DashboardView() {
     }, {});
     const unas = assignments.filter(a => !a.main_writer_id && !a.main_writer_name);
     const sorted = Object.entries(stats).sort((a, b) => {
-      const aT = a[1].mainQty + a[1].subQty + a[1].optimalQty + a[1].inblQty;
-      const bT = b[1].mainQty + b[1].subQty + b[1].optimalQty + b[1].inblQty;
+      const aT = totalQty(a[1]);
+      const bT = totalQty(b[1]);
       return bT - aT;
     });
     return { totalPosts: total, prevTotalPosts: prevTotal, postsDiff: total - prevTotal, statusCounts: counts, unassigned: unas, sortedWriters: sorted };
@@ -157,7 +120,7 @@ export default function DashboardView() {
               <div className="w-px h-6 bg-gray-200" />
               <div className="flex items-center gap-1.5 flex-wrap">
                 {Object.entries(statusCounts).map(([status, count]) => {
-                  const s = STATUS_MAP[status] || { label: status, color: 'text-gray-700', bg: 'bg-gray-100' };
+                  const s = ASSIGNMENT_STATUS_MAP[status] || { label: status, color: 'text-gray-700', bg: 'bg-gray-100' };
                   return (
                     <span key={status} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${s.bg} ${s.color}`}>
                       {s.label} {count}
@@ -209,7 +172,7 @@ export default function DashboardView() {
                 </thead>
                 <tbody>
                   {sortedWriters.map(([id, s]) => {
-                    const total = s.mainQty + s.subQty + s.optimalQty + s.inblQty;
+                    const total = totalQty(s);
                     const diff = total - s.prevTotal;
                     return (
                       <tr key={id} className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors">

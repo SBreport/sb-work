@@ -36,6 +36,9 @@ yarn-error.log*
 # claude
 .claude/
 
+# seed data (개인정보 포함)
+/seed/
+
 # vercel
 .vercel
 

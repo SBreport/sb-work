@@ -88,7 +88,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         )}
 
-        <main className={`flex-1 overflow-auto ${!isMobile && !sidebarOpen ? 'pl-16' : ''} transition-all duration-300`}>
+        <main className={`flex-1 overflow-auto ${isMobile && !sidebarOpen ? 'pt-14' : ''} ${!isMobile && !sidebarOpen ? 'pl-16' : ''} transition-all duration-300`}>
           {children}
         </main>
       </div>

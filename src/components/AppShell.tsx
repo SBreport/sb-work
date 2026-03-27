@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import Sidebar from './Sidebar';
-import Spinner from './Spinner';
+import { FullPageSpinner } from './Spinner';
 import { Menu } from 'lucide-react';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -19,11 +19,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [user, loading, router]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen">
-        <Spinner />
-      </div>
-    );
+    return <FullPageSpinner />;
   }
 
   if (!user) return null;

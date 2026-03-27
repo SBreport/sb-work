@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import AppShell from '@/components/AppShell';
+import { FullPageSpinner } from '@/components/Spinner';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { profile, loading, isAdmin, isViewingAs, viewAsRole } = useAuth();
@@ -22,11 +23,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (!isAdmin) {
       router.replace('/notices');
     }
-  }, [loading, profile, isAdmin, isViewingAs, router]);
+  }, [loading, profile, isAdmin, isViewingAs, viewAsRole, router]);
 
-  if (loading) return null;
-  if (!isAdmin) return null;
-  if (isAdmin && isViewingAs) return null;
+  if (loading) return <FullPageSpinner />;
+  if (!isAdmin) return <FullPageSpinner />;
+  if (isAdmin && isViewingAs) return <FullPageSpinner />;
 
   return <AppShell>{children}</AppShell>;
 }

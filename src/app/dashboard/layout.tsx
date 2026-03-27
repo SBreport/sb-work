@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import AppShell from '@/components/AppShell';
+import { FullPageSpinner } from '@/components/Spinner';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, isAdmin } = useAuth();
@@ -15,13 +16,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace('/login');
       return;
     }
-    // 관리자급(admin/editor)만 접근 가능
     if (!isAdmin) {
       router.replace('/notices');
     }
   }, [loading, user, isAdmin, router]);
 
-  if (loading || !user || !isAdmin) return null;
+  if (loading) return <FullPageSpinner />;
+  if (!user || !isAdmin) return <FullPageSpinner />;
 
   return <AppShell>{children}</AppShell>;
 }

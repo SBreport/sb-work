@@ -4,7 +4,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentMonth, getAdjacentMonth } from '@/lib/date';
 import MonthSelector from '@/components/MonthSelector';
-import MonthlyTrendChart from '@/components/MonthlyTrendChart';
+import dynamic from 'next/dynamic';
+
+const MonthlyTrendChart = dynamic(() => import('@/components/MonthlyTrendChart'), {
+  loading: () => <div className="h-80 bg-gray-50 rounded-lg animate-pulse" />,
+  ssr: false,
+});
 import BranchAlerts from '@/components/BranchAlerts';
 import type { Assignment, AssignmentStatus } from '@/types/database';
 import { AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';

@@ -33,11 +33,17 @@ function calcSummary(assignments: Assignment[], userId: string): MonthSummary {
     if (a.main_writer_id === userId) {
       // 사수의 main_quantity는 항상 직접 '작성'
       writing += a.main_quantity;
-      // 부사수가 따로 있으면, 부사수 작성분(sub_quantity)을 사수가 '검토'
-      const hasSeparateSub = a.sub_writer_id && a.sub_writer_id !== userId;
-      if (hasSeparateSub) review += a.sub_quantity;
+      // 부사수 건수: 따로 있으면 '검토', 겸임이면 '부사수 단가 작성'
+      if (a.sub_writer_id && a.sub_writer_id !== userId) {
+        review += a.sub_quantity;
+      } else if (a.sub_writer_id === userId) {
+        // 겸임: sub_quantity는 부사수 단가이므로 sub에 합산 (writing과 별도)
+        sub += a.sub_quantity;
+      }
+    } else if (a.sub_writer_id === userId) {
+      // 순수 부사수 (사수가 아닌 경우에만)
+      sub += a.sub_quantity;
     }
-    if (a.sub_writer_id === userId) sub += a.sub_quantity;
     if (a.optimal_writer_id === userId) optimal += a.optimal_quantity;
     if (a.inbl_writer_id === userId) inbl += a.inbl_quantity;
   }
@@ -278,15 +284,16 @@ export default function FreelancerPage() {
         if (a.main_writer_id === uid) {
           // 사수의 main_quantity는 항상 직접 '작성'
           roles.push({ label: '작성', qty: a.main_quantity });
-          // 부사수가 따로 있으면, 부사수 작성분을 사수가 '검토'
-          const hasSeparateSub = a.sub_writer_id && a.sub_writer_id !== uid;
-          if (hasSeparateSub) {
+          // 부사수 건수: 따로 있으면 '검토', 겸임이면 '부사수' (단가 구분)
+          if (a.sub_writer_id && a.sub_writer_id !== uid && a.sub_quantity > 0) {
             roles.push({ label: '검토', qty: a.sub_quantity });
+          } else if (a.sub_writer_id === uid && a.sub_quantity > 0) {
+            roles.push({ label: '부사수', qty: a.sub_quantity });
           }
           const subName = (a.sub_writer as { name: string } | undefined)?.name || a.sub_writer_name || null;
           if (subName && a.sub_writer_id !== uid) { partnerName = subName; partnerRole = '부사수'; }
-        }
-        if (a.sub_writer_id === uid) {
+        } else if (a.sub_writer_id === uid) {
+          // 순수 부사수 (사수가 아닌 경우에만)
           roles.push({ label: '부사수', qty: a.sub_quantity });
           const mainName = (a.main_writer as { name: string } | undefined)?.name || a.main_writer_name || null;
           if (mainName && a.main_writer_id !== uid) { partnerName = mainName; partnerRole = '사수'; }
@@ -378,8 +385,8 @@ export default function FreelancerPage() {
   const hasMultipleCategories = Object.keys(byCategory).length > 1;
   const hasMultipleTypes = Object.keys(byType).length > 1;
   const hasPartners = partnerSummary.partners.length > 0 || partnerSummary.bothCount > 0;
-  // 사수(검토 역할 보유) 여부 → 테이블 컬럼 분기용
-  const isReviewer = curSummary.review > 0;
+  // 사수 여부 → 테이블 컬럼 분기용 (검토 or 겸임 부사수 건수 있으면)
+  const isReviewer = curSummary.writing > 0 && (curSummary.review > 0 || myAssignments.some(a => a.main_writer_id === uid && a.sub_writer_id === uid && a.sub_quantity > 0));
 
   const activeRoles = [
     curSummary.writing > 0 ? { label: '작성', qty: curSummary.writing } : null,
@@ -733,7 +740,10 @@ export default function FreelancerPage() {
                       {isReviewer ? (
                         <>
                           <th className="px-2 py-2 font-medium text-blue-600 text-xs whitespace-nowrap text-center w-16">작성</th>
-                          <th className="px-2 py-2 font-medium text-indigo-600 text-xs whitespace-nowrap text-center w-16">검토</th>
+                          <th className="px-2 py-2 font-medium text-indigo-600 text-xs whitespace-nowrap text-center w-16">
+                            {curSummary.review > 0 && myAssignments.some(a => a.main_writer_id === uid && a.sub_writer_id === uid) ? '검토/부사수' :
+                             curSummary.review > 0 ? '검토' : '부사수'}
+                          </th>
                         </>
                       ) : (
                         <SortHeader label="포스팅" sortKeyName="qty" className="text-center w-16" />
@@ -744,7 +754,8 @@ export default function FreelancerPage() {
                   <tbody>
                     {sortedAssignments.map((a, idx) => {
                       const writingRole = a.roles.find(r => r.label === '작성');
-                      const reviewRole = a.roles.find(r => r.label === '검토');
+                      // 검토(별도 부사수) 또는 부사수(겸임) 둘 다 2열에 표시
+                      const reviewRole = a.roles.find(r => r.label === '검토') || (a.main_writer_id === uid ? a.roles.find(r => r.label === '부사수') : null);
                       return (
                         <tr key={a.id} className={`border-b border-gray-50 hover:bg-blue-50/20 ${a.isNew ? 'bg-orange-50/60' : idx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
                           <td className="pl-4 pr-2 py-1.5 text-gray-500 text-xs whitespace-nowrap">{a.renewal_day}일</td>
@@ -768,7 +779,7 @@ export default function FreelancerPage() {
                               </td>
                               <td className="px-2 py-1.5 text-center">
                                 {reviewRole ? (
-                                  <span className="font-bold text-sm text-indigo-600">{reviewRole.qty}</span>
+                                  <span className={`font-bold text-sm ${reviewRole.label === '부사수' ? 'text-green-600' : 'text-indigo-600'}`}>{reviewRole.qty}</span>
                                 ) : (
                                   <span className="text-gray-300">-</span>
                                 )}

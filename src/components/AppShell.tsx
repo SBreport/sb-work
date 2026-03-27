@@ -16,16 +16,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (!loading && !user) {
       router.push('/login');
     }
-    if (!loading && user && profile?.must_change_password && profile?.role !== 'admin' && profile?.role !== 'editor') {
-      const skipCount = profile?.password_skip_count || 0;
-      if (skipCount >= 3) {
-        router.push('/force-change-password');
-      } else if (typeof window !== 'undefined' && !sessionStorage.getItem('pw_skip_done') && !sessionStorage.getItem('pw_skip_shown')) {
-        sessionStorage.setItem('pw_skip_shown', 'true');
-        router.push('/force-change-password');
-      }
-    }
-  }, [user, profile, loading, router]);
+  }, [user, loading, router]);
 
   if (loading) {
     return (

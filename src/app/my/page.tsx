@@ -3,31 +3,23 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { getCurrentMonth, getAdjacentMonth, shortMonthLabel } from '@/lib/date';
 import MonthSelector from '@/components/MonthSelector';
 import type { Assignment } from '@/types/database';
 import NoticeBoard from '@/components/NoticeBoard';
 import { Briefcase, ChevronUp, ChevronDown, LayoutList, LayoutGrid } from 'lucide-react';
-
-function getCurrentMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-function getAdjacentMonth(month: string, offset: number): string {
-  const [y, m] = month.split('-').map(Number);
-  const date = new Date(y, m - 1 + offset, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-function shortMonthLabel(month: string): string {
-  const [, m] = month.split('-');
-  return `${Number(m)}월`;
-}
 function clean(val: string | null | undefined): string {
   return (val || '').replace(/,/g, '').trim();
 }
 
+// 역할 라벨 상수
+const ROLE = { WRITING: '작성', REVIEW: '검토', SUB: '부사수', OPTIMAL: '최적', INBL: '인블' } as const;
+
 interface MonthSummary { total: number; writing: number; review: number; sub: number; optimal: number; inbl: number; }
 
-function calcSummary(assignments: Assignment[], userId: string): MonthSummary {
+type SummaryRow = Pick<Assignment, 'main_writer_id' | 'sub_writer_id' | 'optimal_writer_id' | 'inbl_writer_id' | 'main_quantity' | 'sub_quantity' | 'optimal_quantity' | 'inbl_quantity'>;
+
+function calcSummary(assignments: SummaryRow[], userId: string): MonthSummary {
   let writing = 0, review = 0, sub = 0, optimal = 0, inbl = 0;
   for (const a of assignments) {
     if (a.main_writer_id === userId) {
@@ -248,8 +240,8 @@ export default function FreelancerPage() {
       sub_writer:profiles!assignments_sub_writer_id_fkey(name)`;
     const [curRes, prevRes, nextRes] = await Promise.all([
       supabase.from('assignments').select(selectQuery).eq('month', month).order('renewal_day'),
-      supabase.from('assignments').select('*').eq('month', prevMonth),
-      supabase.from('assignments').select('*').eq('month', nextMonth),
+      supabase.from('assignments').select('branch_id, main_writer_id, sub_writer_id, optimal_writer_id, inbl_writer_id, main_quantity, sub_quantity, optimal_quantity, inbl_quantity').eq('month', prevMonth),
+      supabase.from('assignments').select('branch_id, main_writer_id, sub_writer_id, optimal_writer_id, inbl_writer_id, main_quantity, sub_quantity, optimal_quantity, inbl_quantity').eq('month', nextMonth),
     ]);
     setAssignments(curRes.data || []);
     setPrevSummary(prevRes.data ? calcSummary(prevRes.data, targetUserId) : null);
@@ -285,23 +277,22 @@ export default function FreelancerPage() {
 
         if (a.main_writer_id === uid) {
           // 사수의 main_quantity는 항상 직접 '작성'
-          roles.push({ label: '작성', qty: a.main_quantity });
+          roles.push({ label: ROLE.WRITING, qty: a.main_quantity });
           // 부사수 건수: 따로 있으면 '검토', 겸임이면 '부사수' (단가 구분)
           if (a.sub_writer_id && a.sub_writer_id !== uid && a.sub_quantity > 0) {
-            roles.push({ label: '검토', qty: a.sub_quantity });
+            roles.push({ label: ROLE.REVIEW, qty: a.sub_quantity });
           } else if (a.sub_writer_id === uid && a.sub_quantity > 0) {
-            roles.push({ label: '부사수', qty: a.sub_quantity });
+            roles.push({ label: ROLE.SUB, qty: a.sub_quantity });
           }
           const subName = (a.sub_writer as { name: string } | undefined)?.name || a.sub_writer_name || null;
-          if (subName && a.sub_writer_id !== uid) { partnerName = subName; partnerRole = '부사수'; }
+          if (subName && a.sub_writer_id !== uid) { partnerName = subName; partnerRole = ROLE.SUB; }
         } else if (a.sub_writer_id === uid) {
-          // 순수 부사수 (사수가 아닌 경우에만)
-          roles.push({ label: '부사수', qty: a.sub_quantity });
+          roles.push({ label: ROLE.SUB, qty: a.sub_quantity });
           const mainName = (a.main_writer as { name: string } | undefined)?.name || a.main_writer_name || null;
           if (mainName && a.main_writer_id !== uid) { partnerName = mainName; partnerRole = '사수'; }
         }
-        if (a.optimal_writer_id === uid) roles.push({ label: '최적', qty: a.optimal_quantity });
-        if (a.inbl_writer_id === uid) roles.push({ label: '인블', qty: a.inbl_quantity });
+        if (a.optimal_writer_id === uid) roles.push({ label: ROLE.OPTIMAL, qty: a.optimal_quantity });
+        if (a.inbl_writer_id === uid) roles.push({ label: ROLE.INBL, qty: a.inbl_quantity });
 
         const totalQty = roles.reduce((s, r) => s + r.qty, 0);
         // 전월에 내가 담당하지 않았던 지점이면 '신규'
@@ -427,35 +418,43 @@ export default function FreelancerPage() {
   };
 
   // === 미확인 월 추적 (localStorage) ===
-  const getViewedMonths = useCallback((): Set<string> => {
-    if (!targetUserId) return new Set();
+  const [viewedMonths, setViewedMonths] = useState<Set<string>>(new Set());
+
+  // localStorage에서 최초 1회만 로드
+  useEffect(() => {
+    if (!targetUserId) return;
     try {
       const raw = localStorage.getItem(`viewed_months_${targetUserId}`);
-      return raw ? new Set(JSON.parse(raw)) : new Set();
-    } catch { return new Set(); }
+      if (raw) setViewedMonths(new Set(JSON.parse(raw)));
+    } catch { /* ignore */ }
   }, [targetUserId]);
 
   const markMonthViewed = useCallback((m: string) => {
     if (!targetUserId) return;
-    const viewed = getViewedMonths();
-    viewed.add(m);
-    localStorage.setItem(`viewed_months_${targetUserId}`, JSON.stringify([...viewed]));
-  }, [targetUserId, getViewedMonths]);
+    setViewedMonths(prev => {
+      if (prev.has(m)) return prev;
+      const next = new Set(prev);
+      next.add(m);
+      localStorage.setItem(`viewed_months_${targetUserId}`, JSON.stringify([...next]));
+      return next;
+    });
+  }, [targetUserId]);
 
   const handleSelectMonthWithMark = useCallback((m: string) => {
-    // 관리자 미리보기 모드에서는 viewed 마킹 안 함
-    if (!isViewingAs) {
-      markMonthViewed(m);
-    }
+    if (!isViewingAs) markMonthViewed(m);
     handleSelectMonth(m);
   }, [markMonthViewed, handleSelectMonth, isViewingAs]);
 
+  // 내림차순 정렬 캐싱
+  const sortedCards = useMemo(
+    () => [...monthCards].sort((a, b) => b.month.localeCompare(a.month)),
+    [monthCards]
+  );
+
+  const currentMonth = useMemo(() => getCurrentMonth(), []);
+
   // === 월 선택 대시보드 ===
   if (!selectedMonth) {
-    const currentMonth = getCurrentMonth();
-    const viewedMonths = getViewedMonths();
-    // 내림차순 정렬 (최신 → 과거)
-    const sortedCards = [...monthCards].sort((a, b) => b.month.localeCompare(a.month));
 
     return (
       <div className="p-3 sm:p-4 max-w-[960px]">
@@ -485,17 +484,16 @@ export default function FreelancerPage() {
               const isCurrent = card.month === currentMonth;
               const isUnseen = !viewedMonths.has(card.month) && card.month >= currentMonth;
               const roles = [
-                card.writing > 0 ? { label: '작성', qty: card.writing, color: 'text-blue-600' } : null,
-                card.review > 0 ? { label: '검토', qty: card.review, color: 'text-indigo-600' } : null,
-                card.sub > 0 ? { label: '부사수', qty: card.sub, color: 'text-green-600' } : null,
-                card.optimal > 0 ? { label: '최적', qty: card.optimal, color: 'text-purple-600' } : null,
-                card.inbl > 0 ? { label: '인블', qty: card.inbl, color: 'text-amber-600' } : null,
+                card.writing > 0 ? { label: ROLE.WRITING, qty: card.writing, color: 'text-blue-600' } : null,
+                card.review > 0 ? { label: ROLE.REVIEW, qty: card.review, color: 'text-indigo-600' } : null,
+                card.sub > 0 ? { label: ROLE.SUB, qty: card.sub, color: 'text-green-600' } : null,
+                card.optimal > 0 ? { label: ROLE.OPTIMAL, qty: card.optimal, color: 'text-purple-600' } : null,
+                card.inbl > 0 ? { label: ROLE.INBL, qty: card.inbl, color: 'text-amber-600' } : null,
               ].filter(Boolean) as { label: string; qty: number; color: string }[];
 
               const isEmpty = card.total === 0;
               const hasWritingAndReview = card.writing > 0 && card.review > 0;
-              // 작성/검토 외 나머지 역할
-              const otherRoles = roles.filter(r => r.label !== '작성' && r.label !== '검토');
+              const otherRoles = roles.filter(r => r.label !== ROLE.WRITING && r.label !== ROLE.REVIEW);
 
               return (
                 <button
@@ -752,9 +750,9 @@ export default function FreelancerPage() {
                   </thead>
                   <tbody>
                     {sortedAssignments.map((a, idx) => {
-                      const writingRole = a.roles.find(r => r.label === '작성');
+                      const writingRole = a.roles.find(r => r.label === ROLE.WRITING);
                       // 부사수원고 컬럼: 검토(별도부사수), 겸임부사수, 순수부사수 모두 표시
-                      const reviewRole = a.roles.find(r => r.label === '검토') || a.roles.find(r => r.label === '부사수');
+                      const reviewRole = a.roles.find(r => r.label === ROLE.REVIEW) || a.roles.find(r => r.label === ROLE.SUB);
                       return (
                         <tr key={a.id} className={`border-b border-gray-50 hover:bg-blue-50/20 ${a.isNew ? 'bg-orange-50/60' : idx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
                           <td className="pl-4 pr-2 py-1.5 text-gray-500 text-xs whitespace-nowrap">{a.renewal_day}일</td>
@@ -778,7 +776,7 @@ export default function FreelancerPage() {
                               </td>
                               <td className="px-2 py-1.5 text-center">
                                 {reviewRole ? (
-                                  <span className={`font-bold text-sm ${reviewRole.label === '부사수' ? 'text-green-600' : 'text-indigo-600'}`}>{reviewRole.qty}</span>
+                                  <span className={`font-bold text-sm ${reviewRole.label === ROLE.SUB ? 'text-green-600' : 'text-indigo-600'}`}>{reviewRole.qty}</span>
                                 ) : (
                                   <span className="text-gray-300">-</span>
                                 )}
@@ -824,7 +822,7 @@ export default function FreelancerPage() {
                           {a.roles.length > 1 ? (
                             <div className="flex flex-col items-end gap-0">
                               {a.roles.map(r => (
-                                <p key={r.label} className={`text-xs font-bold leading-tight ${r.label === '작성' ? 'text-blue-600' : r.label === '검토' ? 'text-indigo-600' : r.label === '부사수' ? 'text-green-600' : 'text-gray-700'}`}>
+                                <p key={r.label} className={`text-xs font-bold leading-tight ${r.label === ROLE.WRITING ? 'text-blue-600' : r.label === ROLE.REVIEW ? 'text-indigo-600' : r.label === ROLE.SUB ? 'text-green-600' : 'text-gray-700'}`}>
                                   {r.label} {r.qty}<span className="font-normal text-gray-400">건</span>
                                 </p>
                               ))}

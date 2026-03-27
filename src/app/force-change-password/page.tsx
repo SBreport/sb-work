@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
+import { authFetch } from '@/lib/api-client';
 import { AlertTriangle } from 'lucide-react';
 
 type Step = 'welcome' | 'change' | 'skip-warning';
@@ -50,17 +51,7 @@ export default function ForceChangePasswordPage() {
     router.refresh();
 
     // skip_count 증가는 백그라운드로 (UI 블로킹 없음)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.access_token) {
-        fetch('/api/password-skip', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        });
-      }
-    });
+    authFetch('/api/password-skip', { method: 'POST' }).catch(() => {});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,15 +82,7 @@ export default function ForceChangePasswordPage() {
 
     // service_role API로 must_change_password 플래그 해제 (RLS 우회)
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch('/api/complete-password-change', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-      });
-
+      const res = await authFetch('/api/complete-password-change', { method: 'POST' });
       if (!res.ok) {
         setError('비밀번호는 변경되었으나 프로필 업데이트에 실패했습니다. 다시 로그인해주세요.');
         setLoading(false);

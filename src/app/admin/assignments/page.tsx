@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { authFetch } from '@/lib/api-client';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { getCurrentMonth } from '@/lib/date';
 import MonthSelector from '@/components/MonthSelector';
 import StatusBadge from '@/components/StatusBadge';
 import InlineEditCell from '@/components/InlineEditCell';
@@ -11,11 +12,6 @@ import InlineSelectCell from '@/components/InlineSelectCell';
 import AssignmentModal from './AssignmentModal';
 import type { Assignment, User, AssignmentStatus } from '@/types/database';
 import { Plus, Copy, Download, Trash2, History } from 'lucide-react';
-
-function getCurrentMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
 
 const STATUS_OPTIONS = [
   { value: 'active', label: '활성' },

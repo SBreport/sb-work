@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getCurrentMonth } from '@/lib/date';
 import { Plus, Edit2, Trash2, Pin, Eye, EyeOff } from 'lucide-react';
 
 interface Notice {
@@ -12,11 +13,6 @@ interface Notice {
   is_pinned: boolean;
   is_active: boolean;
   created_at: string;
-}
-
-function getCurrentMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
 export default function NoticesPage() {

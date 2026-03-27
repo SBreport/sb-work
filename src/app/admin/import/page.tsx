@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { authFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
+import { getCurrentMonth } from '@/lib/date';
 import { Upload, Check, AlertCircle, Loader2, Trash2, FileText, X } from 'lucide-react';
 
 interface FileItem {
@@ -18,11 +19,6 @@ interface FileItem {
     unmatchedWriters: string[];
   };
   error?: string;
-}
-
-function getCurrentMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function parseMonthFromFilename(filename: string): string | null {

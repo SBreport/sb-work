@@ -2,22 +2,12 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getCurrentMonth, getAdjacentMonth } from '@/lib/date';
 import MonthSelector from '@/components/MonthSelector';
 import MonthlyTrendChart from '@/components/MonthlyTrendChart';
 import BranchAlerts from '@/components/BranchAlerts';
 import type { Assignment, AssignmentStatus } from '@/types/database';
 import { AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-
-function getCurrentMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function getAdjacentMonth(month: string, offset: number): string {
-  const [y, m] = month.split('-').map(Number);
-  const date = new Date(y, m - 1 + offset, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
 
 interface WriterStats {
   name: string;

@@ -378,6 +378,8 @@ export default function FreelancerPage() {
   const hasMultipleCategories = Object.keys(byCategory).length > 1;
   const hasMultipleTypes = Object.keys(byType).length > 1;
   const hasPartners = partnerSummary.partners.length > 0 || partnerSummary.bothCount > 0;
+  // 사수(검토 역할 보유) 여부 → 테이블 컬럼 분기용
+  const isReviewer = curSummary.review > 0;
 
   const activeRoles = [
     curSummary.writing > 0 ? { label: '작성', qty: curSummary.writing } : null,
@@ -728,54 +730,63 @@ export default function FreelancerPage() {
                       <SortHeader label="갱신일" sortKeyName="renewal_day" className="text-left pl-4 w-14" />
                       <SortHeader label="과목" sortKeyName="category" className="text-left w-14" />
                       <SortHeader label="지점명" sortKeyName="name" className="text-left" />
-                      <SortHeader label="역할" sortKeyName="role" className="text-center w-24" />
-                      <th className="px-2 py-2 font-medium text-gray-500 text-xs whitespace-nowrap text-center">포스팅</th>
+                      {isReviewer ? (
+                        <>
+                          <th className="px-2 py-2 font-medium text-blue-600 text-xs whitespace-nowrap text-center w-16">작성</th>
+                          <th className="px-2 py-2 font-medium text-indigo-600 text-xs whitespace-nowrap text-center w-16">검토</th>
+                        </>
+                      ) : (
+                        <SortHeader label="포스팅" sortKeyName="qty" className="text-center w-16" />
+                      )}
                       <th className="px-3 py-2 text-left font-medium text-gray-500 text-xs whitespace-nowrap">함께하는 담당자</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedAssignments.map((a, idx) => (
-                      <tr key={a.id} className={`border-b border-gray-50 hover:bg-blue-50/20 ${a.isNew ? 'bg-orange-50/60' : idx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
-                        <td className="pl-4 pr-2 py-1.5 text-gray-500 text-xs whitespace-nowrap">{a.renewal_day}일</td>
-                        <td className="px-2 py-1.5">
-                          <span className={`inline-block px-1.5 py-0.5 rounded border text-[11px] whitespace-nowrap ${catColors[clean(a.branch?.category)] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                            {clean(a.branch?.category) || '-'}
-                          </span>
-                        </td>
-                        <td className="px-2 py-1.5 font-medium text-gray-900 whitespace-nowrap">
-                          {a.branch?.name || '-'}
-                          {a.isNew && <span className="ml-1.5 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded text-[10px] font-semibold">신규</span>}
-                        </td>
-                        <td className="px-2 py-1.5 text-center">
-                          <div className="inline-flex gap-0.5">
-                            {a.roles.map(r => (
-                              <span key={r.label} className={`px-1.5 py-0.5 rounded text-[11px] font-medium whitespace-nowrap ${ROLE_TAG[r.label] || 'bg-gray-100 text-gray-600'}`}>
-                                {r.label}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-2 py-1.5 text-center whitespace-nowrap">
-                          {a.roles.length > 1 ? (
-                            <div className="inline-flex items-center gap-0.5 text-[11px]">
-                              {a.roles.map((r, i) => (
-                                <span key={r.label}>
-                                  {i > 0 && <span className="text-gray-300 mx-0.5">/</span>}
-                                  <span className={`font-bold ${r.label === '작성' ? 'text-blue-600' : r.label === '검토' ? 'text-indigo-600' : r.label === '부사수' ? 'text-green-600' : 'text-gray-700'}`}>
-                                    {r.qty}
-                                  </span>
-                                </span>
-                              ))}
-                            </div>
-                          ) : a.totalQty > 0 ? (
-                            <span className="font-bold text-gray-900">{a.totalQty}</span>
+                    {sortedAssignments.map((a, idx) => {
+                      const writingRole = a.roles.find(r => r.label === '작성');
+                      const reviewRole = a.roles.find(r => r.label === '검토');
+                      return (
+                        <tr key={a.id} className={`border-b border-gray-50 hover:bg-blue-50/20 ${a.isNew ? 'bg-orange-50/60' : idx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
+                          <td className="pl-4 pr-2 py-1.5 text-gray-500 text-xs whitespace-nowrap">{a.renewal_day}일</td>
+                          <td className="px-2 py-1.5">
+                            <span className={`inline-block px-1.5 py-0.5 rounded border text-[11px] whitespace-nowrap ${catColors[clean(a.branch?.category)] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                              {clean(a.branch?.category) || '-'}
+                            </span>
+                          </td>
+                          <td className="px-2 py-1.5 font-medium text-gray-900 whitespace-nowrap">
+                            {a.branch?.name || '-'}
+                            {a.isNew && <span className="ml-1.5 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded text-[10px] font-semibold">신규</span>}
+                          </td>
+                          {isReviewer ? (
+                            <>
+                              <td className="px-2 py-1.5 text-center">
+                                {writingRole ? (
+                                  <span className="font-bold text-sm text-blue-600">{writingRole.qty}</span>
+                                ) : (
+                                  <span className="text-gray-300">-</span>
+                                )}
+                              </td>
+                              <td className="px-2 py-1.5 text-center">
+                                {reviewRole ? (
+                                  <span className="font-bold text-sm text-indigo-600">{reviewRole.qty}</span>
+                                ) : (
+                                  <span className="text-gray-300">-</span>
+                                )}
+                              </td>
+                            </>
                           ) : (
-                            <span className="text-red-500 text-xs font-semibold">확인</span>
+                            <td className="px-2 py-1.5 text-center">
+                              {a.totalQty > 0 ? (
+                                <span className="font-bold text-sm text-gray-900">{a.totalQty}</span>
+                              ) : (
+                                <span className="text-red-500 text-xs font-semibold">확인</span>
+                              )}
+                            </td>
                           )}
-                        </td>
-                        <td className="px-3 py-1.5">{renderPartner(a)}</td>
-                      </tr>
-                    ))}
+                          <td className="px-3 py-1.5">{renderPartner(a)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}

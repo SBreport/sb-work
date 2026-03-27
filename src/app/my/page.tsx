@@ -729,7 +729,7 @@ export default function FreelancerPage() {
                       <SortHeader label="과목" sortKeyName="category" className="text-left w-14" />
                       <SortHeader label="지점명" sortKeyName="name" className="text-left" />
                       <SortHeader label="역할" sortKeyName="role" className="text-center w-24" />
-                      <SortHeader label="포스팅" sortKeyName="qty" className="text-center w-14" />
+                      <th className="px-2 py-2 font-medium text-gray-500 text-xs whitespace-nowrap text-center">포스팅</th>
                       <th className="px-3 py-2 text-left font-medium text-gray-500 text-xs whitespace-nowrap">함께하는 담당자</th>
                     </tr>
                   </thead>
@@ -755,8 +755,19 @@ export default function FreelancerPage() {
                             ))}
                           </div>
                         </td>
-                        <td className="px-2 py-1.5 text-center">
-                          {a.totalQty > 0 ? (
+                        <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                          {a.roles.length > 1 ? (
+                            <div className="inline-flex items-center gap-0.5 text-[11px]">
+                              {a.roles.map((r, i) => (
+                                <span key={r.label}>
+                                  {i > 0 && <span className="text-gray-300 mx-0.5">/</span>}
+                                  <span className={`font-bold ${r.label === '작성' ? 'text-blue-600' : r.label === '검토' ? 'text-indigo-600' : r.label === '부사수' ? 'text-green-600' : 'text-gray-700'}`}>
+                                    {r.qty}
+                                  </span>
+                                </span>
+                              ))}
+                            </div>
+                          ) : a.totalQty > 0 ? (
                             <span className="font-bold text-gray-900">{a.totalQty}</span>
                           ) : (
                             <span className="text-red-500 text-xs font-semibold">확인</span>
@@ -789,7 +800,15 @@ export default function FreelancerPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          {a.totalQty > 0 ? (
+                          {a.roles.length > 1 ? (
+                            <div className="flex flex-col items-end gap-0">
+                              {a.roles.map(r => (
+                                <p key={r.label} className={`text-xs font-bold leading-tight ${r.label === '작성' ? 'text-blue-600' : r.label === '검토' ? 'text-indigo-600' : r.label === '부사수' ? 'text-green-600' : 'text-gray-700'}`}>
+                                  {r.label} {r.qty}<span className="font-normal text-gray-400">건</span>
+                                </p>
+                              ))}
+                            </div>
+                          ) : a.totalQty > 0 ? (
                             <p className="text-lg font-bold text-gray-900">{a.totalQty}<span className="text-xs font-normal text-gray-400 ml-0.5">건</span></p>
                           ) : (
                             <p className="text-xs font-semibold text-red-500">확인 필요</p>

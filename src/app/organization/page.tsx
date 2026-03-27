@@ -274,15 +274,15 @@ export default function OrganizationPage() {
 
   // 팀 찾기
   const teamByName = (name: string) => data.teams.find(t => t.name === name);
-  const bizSupport = teamByName('경영지원');
-  // 1열 (이사 아래): 경영지원 + 상위노출팀 + 바이럴팀
-  const col1Teams = ['상위노출팀', '바이럴팀']
+  // 좌열 팀: 경영지원 + 상위노출팀 + 바이럴팀
+  const leftTeams = ['경영지원', '상위노출팀', '바이럴팀']
     .map(n => teamByName(n))
     .filter(Boolean) as Team[];
-  // 2열 (총괄팀장 아래): 블로그팀 + 브랜딩팀
-  const col2Teams = ['블로그팀', '브랜딩팀']
+  // 우열 팀: 블로그팀 + 브랜딩팀
+  const rightTeams = ['블로그팀', '브랜딩팀']
     .map(n => teamByName(n))
     .filter(Boolean) as Team[];
+  const allTeams = [...leftTeams, ...rightTeams];
   const otherTeams = data.teams.filter(t =>
     !['블로그팀', '바이럴팀', '상위노출팀', '브랜딩팀', '경영지원'].includes(t.name)
   );
@@ -298,34 +298,39 @@ export default function OrganizationPage() {
         </div>
       )}
 
-      {/* ── 이사 | 총괄팀장 — PC: 2열, 모바일: 1열 ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-        {/* 1열: 이사 → 경영지원 + 상위노출팀 + 바이럴팀 */}
+      {/* ── 임원 행: 이사 | 총괄팀장 — PC: 2열, 모바일: 세로 ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {director && (
           <div className="pl-4 border-l-2 border-blue-200">
             <ExecutiveHeader member={director} onClick={() => onClick(director)} isMe={director.id === myId} />
-            <div className="mt-3 space-y-3">
-              {bizSupport && (
-                <TeamCard team={bizSupport} onMemberClick={onClick} myId={myId} />
-              )}
-              {col1Teams.map(team => (
-                <TeamCard key={team.id} team={team} onMemberClick={onClick} myId={myId} />
-              ))}
-            </div>
           </div>
         )}
-
-        {/* 2열: 총괄팀장 → 블로그팀 + 브랜딩팀 */}
         {gm && (
           <div className="pl-4 border-l-2 border-indigo-200">
             <ExecutiveHeader member={gm} onClick={() => onClick(gm)} isMe={gm.id === myId} />
-            <div className="mt-3 space-y-3">
-              {col2Teams.map(team => (
-                <TeamCard key={team.id} team={team} onMemberClick={onClick} myId={myId} />
-              ))}
-            </div>
           </div>
         )}
+      </div>
+
+      {/* ── 팀 행: PC 2열(좌3/우2), 모바일 1열(전체 순서대로) ── */}
+      {/* 모바일: 전체 팀 순서대로 */}
+      <div className="md:hidden space-y-3">
+        {allTeams.map(team => (
+          <TeamCard key={team.id} team={team} onMemberClick={onClick} myId={myId} />
+        ))}
+      </div>
+      {/* PC: 2열 그리드 */}
+      <div className="hidden md:grid md:grid-cols-2 gap-4 items-start">
+        <div className="space-y-3">
+          {leftTeams.map(team => (
+            <TeamCard key={team.id} team={team} onMemberClick={onClick} myId={myId} />
+          ))}
+        </div>
+        <div className="space-y-3">
+          {rightTeams.map(team => (
+            <TeamCard key={team.id} team={team} onMemberClick={onClick} myId={myId} />
+          ))}
+        </div>
       </div>
 
       {/* 기타 팀 (있으면) */}

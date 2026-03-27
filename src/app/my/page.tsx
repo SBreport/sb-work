@@ -98,12 +98,13 @@ interface MonthCard {
   total: number;
   writing: number;
   review: number;
-  sub: number;
+  subSelf: number; // 겸임 부사수 건수 (사수이면서 본인이 부사수)
+  sub: number; // 순수 부사수 건수 (사수가 아닌 지점)
   optimal: number;
   inbl: number;
   branchCount: number;
-  branchIds: Set<string>; // 담당 지점 ID 집합 (변경 감지용)
-  hasChange?: boolean; // 전월 대비 지점 변경 여부
+  branchIds: Set<string>;
+  hasChange?: boolean;
 }
 
 export default function FreelancerPage() {
@@ -153,28 +154,34 @@ export default function FreelancerPage() {
 
     // 월별 집계
     const monthMap = new Map<string, MonthCard>();
-    const emptyCard = (month: string): MonthCard => ({ month, total: 0, writing: 0, review: 0, sub: 0, optimal: 0, inbl: 0, branchCount: 0, branchIds: new Set() });
+    const emptyCard = (month: string): MonthCard => ({ month, total: 0, writing: 0, review: 0, subSelf: 0, sub: 0, optimal: 0, inbl: 0, branchCount: 0, branchIds: new Set() });
 
     for (const a of allAssignments) {
       if (!monthMap.has(a.month)) monthMap.set(a.month, emptyCard(a.month));
       const card = monthMap.get(a.month)!;
       let counted = false;
       if (a.main_writer_id === targetUserId) {
-        // 사수의 main_quantity는 항상 직접 '작성'
         card.writing += a.main_quantity;
-        // 부사수가 따로 있으면, 부사수 작성분(sub_quantity)을 사수가 '검토'
-        const hasSeparateSub = a.sub_writer_id && a.sub_writer_id !== targetUserId;
-        if (hasSeparateSub) card.review += a.sub_quantity;
+        if (a.sub_writer_id && a.sub_writer_id !== targetUserId) {
+          // 별도 부사수 → 검토
+          card.review += a.sub_quantity;
+        } else if (a.sub_writer_id === targetUserId) {
+          // 겸임 부사수 → subSelf (부사수 단가)
+          card.subSelf += a.sub_quantity;
+        }
+        counted = true;
+      } else if (a.sub_writer_id === targetUserId) {
+        // 순수 부사수 (다른 지점에서 사수가 아닌 경우)
+        card.sub += a.sub_quantity;
         counted = true;
       }
-      if (a.sub_writer_id === targetUserId) { card.sub += a.sub_quantity; counted = true; }
       if (a.optimal_writer_id === targetUserId) { card.optimal += a.optimal_quantity; counted = true; }
       if (a.inbl_writer_id === targetUserId) { card.inbl += a.inbl_quantity; counted = true; }
       if (counted) { card.branchCount++; card.branchIds.add(a.branch_id); }
     }
 
     for (const card of monthMap.values()) {
-      card.total = card.writing + card.review + card.sub + card.optimal + card.inbl;
+      card.total = card.writing + card.review + card.subSelf + card.sub + card.optimal + card.inbl;
     }
 
     // 가장 오래된 활동 월 ~ 시스템 최대 월 사이 빈 월도 0건 카드로 채움
@@ -483,17 +490,19 @@ export default function FreelancerPage() {
               const [y, m] = card.month.split('-');
               const isCurrent = card.month === currentMonth;
               const isUnseen = !viewedMonths.has(card.month) && card.month >= currentMonth;
-              const roles = [
-                card.writing > 0 ? { label: ROLE.WRITING, qty: card.writing, color: 'text-blue-600' } : null,
-                card.review > 0 ? { label: ROLE.REVIEW, qty: card.review, color: 'text-indigo-600' } : null,
-                card.sub > 0 ? { label: ROLE.SUB, qty: card.sub, color: 'text-green-600' } : null,
+              const isEmpty = card.total === 0;
+              // 부사수원고 합계 (검토 + 겸임 + 순수부사수)
+              const subTotal = card.review + card.subSelf + card.sub;
+              // 사수 카드 형태: writing이 있고, 부사수원고가 있을 때
+              const hasWritingAndReview = card.writing > 0 && subTotal > 0;
+
+              // 하단 역할 태그 (사수 카드일 경우 writing/sub 계열은 상단에 표시되므로 제외)
+              const otherRoles = [
+                !hasWritingAndReview && card.writing > 0 ? { label: ROLE.WRITING, qty: card.writing, color: 'text-blue-600' } : null,
+                !hasWritingAndReview && subTotal > 0 ? { label: ROLE.SUB, qty: subTotal, color: 'text-green-600' } : null,
                 card.optimal > 0 ? { label: ROLE.OPTIMAL, qty: card.optimal, color: 'text-purple-600' } : null,
                 card.inbl > 0 ? { label: ROLE.INBL, qty: card.inbl, color: 'text-amber-600' } : null,
               ].filter(Boolean) as { label: string; qty: number; color: string }[];
-
-              const isEmpty = card.total === 0;
-              const hasWritingAndReview = card.writing > 0 && card.review > 0;
-              const otherRoles = roles.filter(r => r.label !== ROLE.WRITING && r.label !== ROLE.REVIEW);
 
               return (
                 <button
@@ -532,7 +541,7 @@ export default function FreelancerPage() {
                         <div>
                           <span className="text-[10px] text-indigo-500 font-medium">부사수원고</span>
                           <p className="text-xl font-bold text-indigo-600 leading-tight">
-                            {card.review}<span className="text-[10px] font-normal text-gray-400 ml-0.5">건</span>
+                            {subTotal}<span className="text-[10px] font-normal text-gray-400 ml-0.5">건</span>
                           </p>
                         </div>
                       </div>

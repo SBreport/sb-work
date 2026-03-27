@@ -12,25 +12,27 @@ export async function GET(request: NextRequest) {
 
   const supabase = createServerSupabase();
 
-  // 팀 목록 조회
-  const { data: teams, error: teamsError } = await supabase
-    .from('teams')
-    .select('id, name, sort_order, acting_leader_id')
-    .order('sort_order');
+  // 팀 + 멤버를 병렬로 조회
+  const [teamsResult, membersResult] = await Promise.all([
+    supabase
+      .from('teams')
+      .select('id, name, sort_order, acting_leader_id')
+      .order('sort_order'),
+    supabase
+      .from('profiles')
+      .select('id, name, email, phone, role, position, mentor_role, sort_order, team_id, employee_type, is_active')
+      .neq('is_active', false)
+      .neq('name', 'admin')
+      .or('team_id.not.is.null,employee_type.eq.internal,employee_type.eq.partner')
+      .order('sort_order'),
+  ]);
 
+  const { data: teams, error: teamsError } = teamsResult;
   if (teamsError) {
     return NextResponse.json({ error: teamsError.message }, { status: 500 });
   }
 
-  // 조직도에 표시할 프로필 조회 (DB에서 필터링)
-  const { data: members, error: membersError } = await supabase
-    .from('profiles')
-    .select('id, name, email, phone, role, position, mentor_role, sort_order, team_id, employee_type, is_active')
-    .neq('is_active', false)
-    .neq('name', 'admin')
-    .or('team_id.not.is.null,employee_type.eq.internal,employee_type.eq.partner')
-    .order('sort_order');
-
+  const { data: members, error: membersError } = membersResult;
   const filteredMembers = members || [];
 
   if (membersError) {
@@ -48,7 +50,10 @@ export async function GET(request: NextRequest) {
   // 팀 미소속 경영진 (team_id가 null인 internal 멤버)
   const unassigned = filteredMembers.filter(m => !m.team_id);
 
-  return NextResponse.json({ teams: teamsWithMembers, unassigned });
+  return NextResponse.json(
+    { teams: teamsWithMembers, unassigned },
+    { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' } }
+  );
 }
 
 /**

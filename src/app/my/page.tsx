@@ -31,10 +31,11 @@ function calcSummary(assignments: Assignment[], userId: string): MonthSummary {
   let writing = 0, review = 0, sub = 0, optimal = 0, inbl = 0;
   for (const a of assignments) {
     if (a.main_writer_id === userId) {
-      // 부사수가 따로 있으면 → 검토, 없거나 본인이면 → 작성
+      // 사수의 main_quantity는 항상 직접 '작성'
+      writing += a.main_quantity;
+      // 부사수가 따로 있으면, 부사수 작성분(sub_quantity)을 사수가 '검토'
       const hasSeparateSub = a.sub_writer_id && a.sub_writer_id !== userId;
-      if (hasSeparateSub) review += a.main_quantity;
-      else writing += a.main_quantity;
+      if (hasSeparateSub) review += a.sub_quantity;
     }
     if (a.sub_writer_id === userId) sub += a.sub_quantity;
     if (a.optimal_writer_id === userId) optimal += a.optimal_quantity;
@@ -159,9 +160,11 @@ export default function FreelancerPage() {
       const card = monthMap.get(a.month)!;
       let counted = false;
       if (a.main_writer_id === targetUserId) {
+        // 사수의 main_quantity는 항상 직접 '작성'
+        card.writing += a.main_quantity;
+        // 부사수가 따로 있으면, 부사수 작성분(sub_quantity)을 사수가 '검토'
         const hasSeparateSub = a.sub_writer_id && a.sub_writer_id !== targetUserId;
-        if (hasSeparateSub) card.review += a.main_quantity;
-        else card.writing += a.main_quantity;
+        if (hasSeparateSub) card.review += a.sub_quantity;
         counted = true;
       }
       if (a.sub_writer_id === targetUserId) { card.sub += a.sub_quantity; counted = true; }
@@ -273,8 +276,13 @@ export default function FreelancerPage() {
         let partnerRole: string | null = null;
 
         if (a.main_writer_id === uid) {
+          // 사수의 main_quantity는 항상 직접 '작성'
+          roles.push({ label: '작성', qty: a.main_quantity });
+          // 부사수가 따로 있으면, 부사수 작성분을 사수가 '검토'
           const hasSeparateSub = a.sub_writer_id && a.sub_writer_id !== uid;
-          roles.push({ label: hasSeparateSub ? '검토' : '작성', qty: a.main_quantity });
+          if (hasSeparateSub) {
+            roles.push({ label: '검토', qty: a.sub_quantity });
+          }
           const subName = (a.sub_writer as { name: string } | undefined)?.name || a.sub_writer_name || null;
           if (subName && a.sub_writer_id !== uid) { partnerName = subName; partnerRole = '부사수'; }
         }

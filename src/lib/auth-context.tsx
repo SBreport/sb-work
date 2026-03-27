@@ -96,6 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setViewAsProfile(null);
     await supabase.auth.signOut();
     setProfile(null);
+    setUser(null);
+    // 클라이언트 상태 완전 초기화를 위해 full reload
+    window.location.href = '/login';
   }, []);
 
   const setViewAs = useCallback((id: string | null, role: ViewAsRole = null) => {

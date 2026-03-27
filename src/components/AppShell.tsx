@@ -7,17 +7,23 @@ import Sidebar from './Sidebar';
 import { FullPageSpinner } from './Spinner';
 import { Menu } from 'lucide-react';
 
+// 초기값을 클라이언트에서 즉시 결정 (useEffect 전 깜빡임 방지)
+function getInitialMedia() {
+  if (typeof window === 'undefined') return { mobile: false, open: true };
+  const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+  return { mobile: !isDesktop, open: isDesktop };
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const initial = getInitialMedia();
+  const [sidebarOpen, setSidebarOpen] = useState(initial.open);
+  const [isMobile, setIsMobile] = useState(initial.mobile);
 
-  // 화면 크기 감지: 모바일 < 768px
+  // 화면 크기 변경 감지
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 768px)');
-    setIsMobile(!mq.matches);
-    setSidebarOpen(mq.matches);
     const handler = (e: MediaQueryListEvent) => {
       setIsMobile(!e.matches);
       setSidebarOpen(e.matches);

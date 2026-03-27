@@ -697,7 +697,7 @@ export default function FreelancerPage() {
                   </thead>
                   <tbody>
                     {sortedAssignments.map((a, idx) => (
-                      <tr key={a.id} className={`border-b border-gray-50 hover:bg-blue-50/20 ${idx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
+                      <tr key={a.id} className={`border-b border-gray-50 hover:bg-blue-50/20 ${a.isNew ? 'bg-orange-50/60' : idx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
                         <td className="pl-4 pr-2 py-1.5 text-gray-500 text-xs whitespace-nowrap">{a.renewal_day}일</td>
                         <td className="px-2 py-1.5">
                           <span className={`inline-block px-1.5 py-0.5 rounded border text-[11px] whitespace-nowrap ${catColors[clean(a.branch?.category)] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
@@ -735,7 +735,7 @@ export default function FreelancerPage() {
               {viewMode === 'card' && (
                 <div className="grid grid-cols-1 gap-2 p-2 sm:p-3 sm:grid-cols-2">
                   {sortedAssignments.map(a => (
-                    <div key={a.id} className="border border-gray-200 rounded-lg p-3 hover:border-blue-200 hover:bg-blue-50/10 transition-colors">
+                    <div key={a.id} className={`border rounded-lg p-3 transition-colors ${a.isNew ? 'border-orange-200 bg-orange-50/50 hover:border-orange-300' : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50/10'}`}>
                       {/* 상단: 지점명 + 포스팅 수 */}
                       <div className="flex items-start justify-between mb-2">
                         <div>

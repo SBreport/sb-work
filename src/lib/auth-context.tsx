@@ -51,10 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, fetchProfile]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
+        // profile까지 로드 완료 후 loading 해제 → 빈 화면 방지
+        await fetchProfile(session.user.id);
       }
       setLoading(false);
     });

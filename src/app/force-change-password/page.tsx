@@ -167,28 +167,28 @@ export default function ForceChangePasswordPage() {
         {/* 건너뛰기 경고 */}
         {step === 'skip-warning' && (
           <div className="text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-5">
-              <AlertTriangle className="w-8 h-8 text-red-500" />
+            <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-5">
+              <AlertTriangle className="w-8 h-8 text-amber-500" />
             </div>
             <h1 className="text-lg font-bold text-gray-900 mb-3">
-              정말 건너뛰시겠습니까?
+              비밀번호 변경을 권장드려요
             </h1>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-5 text-left">
-              <p className="text-sm text-red-800 font-medium mb-2">
-                비밀번호를 변경하지 않으면:
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-5 text-left">
+              <p className="text-sm text-amber-800 font-medium mb-2">
+                잠깐! 변경 전에 알려드릴게요 :
               </p>
-              <ul className="text-sm text-red-700 space-y-1.5">
+              <ul className="text-sm text-amber-700 space-y-1.5">
                 <li className="flex items-start gap-2">
-                  <span className="text-red-400 mt-0.5">&#x2022;</span>
-                  <span>초기 비밀번호를 아는 누구나 귀하의 계정에 접근할 수 있습니다.</span>
+                  <span className="text-amber-400 mt-0.5">&#x2022;</span>
+                  <span>초기 비밀번호는 다른 분도 알 수 있어, 변경하시면 더 안전해요.</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-400 mt-0.5">&#x2022;</span>
-                  <span>귀하의 업무 정보가 다른 사람에게 노출될 위험이 있습니다.</span>
+                  <span className="text-amber-400 mt-0.5">&#x2022;</span>
+                  <span>나만의 비밀번호로 바꾸면 업무 정보를 안전하게 보호할 수 있어요.</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-400 mt-0.5">&#x2022;</span>
-                  <span>건너뛰기는 <strong>{3 - skipCount}회</strong>만 가능하며, 이후 강제 변경됩니다.</span>
+                  <span className="text-amber-400 mt-0.5">&#x2022;</span>
+                  <span>건너뛰기는 <strong>{3 - skipCount}회</strong> 더 가능해요.</span>
                 </li>
               </ul>
             </div>
@@ -198,13 +198,13 @@ export default function ForceChangePasswordPage() {
                 onClick={() => setStep('change')}
                 className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
               >
-                지금 비밀번호 변경하기
+                지금 변경할게요
               </button>
               <button
                 onClick={handleSkip}
                 className="w-full py-2.5 border border-gray-300 text-gray-500 rounded-lg text-sm hover:bg-gray-50 transition-colors"
               >
-                위험을 이해했습니다. 나중에 변경하겠습니다.
+                다음에 변경할게요
               </button>
             </div>
           </div>

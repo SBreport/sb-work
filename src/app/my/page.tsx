@@ -482,6 +482,9 @@ export default function FreelancerPage() {
               ].filter(Boolean) as { label: string; qty: number; color: string }[];
 
               const isEmpty = card.total === 0;
+              const hasWritingAndReview = card.writing > 0 && card.review > 0;
+              // 작성/검토 외 나머지 역할
+              const otherRoles = roles.filter(r => r.label !== '작성' && r.label !== '검토');
 
               return (
                 <button
@@ -505,25 +508,60 @@ export default function FreelancerPage() {
                     </span>
                     <span className="text-[10px] text-gray-400">{y}</span>
                   </div>
-                  <p className={`text-2xl font-bold mb-1 ${isCurrent ? 'text-blue-600' : isEmpty ? 'text-gray-300' : 'text-gray-800'}`}>
-                    {card.total}<span className="text-xs font-normal text-gray-400 ml-0.5">건</span>
-                  </p>
-                  <p className="text-[10px] text-gray-400 mb-2">
-                    {isEmpty ? '배정 없음' : `${card.branchCount}개 지점`}
-                    {card.hasChange && !isEmpty && (
-                      <span className="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded font-semibold">변경</span>
-                    )}
-                    {card.hasChange && isEmpty && (
-                      <span className="ml-1 px-1.5 py-0.5 bg-red-100 text-red-500 border border-red-200 rounded font-semibold">중단</span>
-                    )}
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {roles.map(r => (
-                      <span key={r.label} className={`text-[10px] ${r.color}`}>
-                        {r.label} {r.qty}
-                      </span>
-                    ))}
-                  </div>
+
+                  {hasWritingAndReview ? (
+                    <>
+                      {/* 사수: 작성/검토 분리 강조 표시 */}
+                      <div className="flex items-end gap-3 mb-1.5">
+                        <div>
+                          <span className="text-[10px] text-blue-500 font-medium">작성</span>
+                          <p className="text-xl font-bold text-blue-600 leading-tight">
+                            {card.writing}<span className="text-[10px] font-normal text-gray-400 ml-0.5">건</span>
+                          </p>
+                        </div>
+                        <div className="text-gray-300 text-sm pb-0.5">+</div>
+                        <div>
+                          <span className="text-[10px] text-indigo-500 font-medium">검토</span>
+                          <p className="text-xl font-bold text-indigo-600 leading-tight">
+                            {card.review}<span className="text-[10px] font-normal text-gray-400 ml-0.5">건</span>
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-gray-400 mb-1">
+                        {`${card.branchCount}개 지점 · 총 ${card.total}건`}
+                        {card.hasChange && (
+                          <span className="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded font-semibold">변경</span>
+                        )}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      {/* 부사수/단일 역할: 기존 총합 표시 */}
+                      <p className={`text-2xl font-bold mb-1 ${isCurrent ? 'text-blue-600' : isEmpty ? 'text-gray-300' : 'text-gray-800'}`}>
+                        {card.total}<span className="text-xs font-normal text-gray-400 ml-0.5">건</span>
+                      </p>
+                      <p className="text-[10px] text-gray-400 mb-2">
+                        {isEmpty ? '배정 없음' : `${card.branchCount}개 지점`}
+                        {card.hasChange && !isEmpty && (
+                          <span className="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded font-semibold">변경</span>
+                        )}
+                        {card.hasChange && isEmpty && (
+                          <span className="ml-1 px-1.5 py-0.5 bg-red-100 text-red-500 border border-red-200 rounded font-semibold">중단</span>
+                        )}
+                      </p>
+                    </>
+                  )}
+
+                  {/* 기타 역할 (부사수, 최적, 인블 등) */}
+                  {otherRoles.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {otherRoles.map(r => (
+                        <span key={r.label} className={`text-[10px] ${r.color}`}>
+                          {r.label} {r.qty}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {isCurrent && (
                     <span className="inline-block mt-2 text-[10px] px-2 py-0.5 bg-blue-200 text-blue-700 rounded-full font-semibold">
                       이번달

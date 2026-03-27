@@ -10,23 +10,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && profile && !isAdmin) {
-      // 프리랜서가 /admin 접근 시 → 자기 페이지로 리다이렉트
+    if (loading || !profile) return;
+
+    // 미리보기 모드일 때는 프리랜서 페이지로
+    if (isAdmin && isViewingAs) {
       router.replace('/my');
+      return;
     }
-    if (!loading && isAdmin && isViewingAs) {
-      // 관리자가 미리보기 모드에서 /admin 접근 시 → 내 업무 페이지로 리다이렉트
-      router.replace('/my');
+
+    // 관리자가 아니면 공통 페이지로 리다이렉트
+    if (!isAdmin) {
+      router.replace('/notices');
     }
   }, [loading, profile, isAdmin, isViewingAs, router]);
 
-  // 프리랜서이거나 미리보기 모드면 빈 화면 (리다이렉트 대기)
-  if (!loading && profile && !isAdmin) {
-    return null;
-  }
-  if (!loading && isAdmin && isViewingAs) {
-    return null;
-  }
+  if (loading) return null;
+  if (!isAdmin) return null;
+  if (isAdmin && isViewingAs) return null;
 
   return <AppShell>{children}</AppShell>;
 }

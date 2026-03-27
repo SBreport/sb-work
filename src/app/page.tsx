@@ -31,6 +31,8 @@ export default function Home() {
     // 역할별 홈 라우팅
     if (profile?.role === 'admin' || profile?.role === 'editor') {
       router.push('/admin/dashboard');
+    } else if (profile?.role === 'employee') {
+      router.push('/notices');
     } else {
       router.push('/my');
     }

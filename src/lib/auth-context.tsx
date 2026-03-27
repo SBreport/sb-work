@@ -13,6 +13,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   isAdmin: boolean;
   isEditor: boolean;
+  isEmployee: boolean;
   refreshProfile: () => Promise<void>;
   // 관리자 모드 전환
   viewAsWriterId: string | null;
@@ -107,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       isAdmin: profile?.role === 'admin' || profile?.role === 'editor',
       isEditor: profile?.role === 'editor',
+      isEmployee: profile?.role === 'employee',
       refreshProfile,
       viewAsWriterId,
       viewAsProfile,

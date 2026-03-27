@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'editor' | 'freelancer';
+export type UserRole = 'admin' | 'editor' | 'employee' | 'freelancer' | 'partner';
 
 export type AssignmentStatus = 'active' | 'new' | 'changed' | 'terminated' | 'ai' | 'both';
 
@@ -16,7 +16,23 @@ export interface User {
   password_skip_count: number;
   contract_start?: string | null;
   contract_end?: string | null;
+  // 조직도 관련
+  team_id?: string | null;
+  position?: string | null;       // '대표', '이사', '총괄팀장', '팀장', '팀원'
+  mentor_role?: string | null;    // '사수', '부사수'
+  sort_order?: number;
+  employee_type?: 'internal' | 'freelancer' | 'partner';
   created_at: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  sort_order: number;
+  acting_leader_id: string | null;
+  acting_leader?: User;
+  created_at: string;
+  members?: User[];
 }
 
 export interface Branch {

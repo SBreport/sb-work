@@ -2,6 +2,6 @@
 
 import DashboardView from '@/components/DashboardView';
 
-export default function AdminDashboardPage() {
+export default function PublicDashboardPage() {
   return <DashboardView />;
 }

@@ -275,12 +275,12 @@ export default function OrganizationPage() {
   // 팀 찾기
   const teamByName = (name: string) => data.teams.find(t => t.name === name);
   const bizSupport = teamByName('경영지원');
-  // 2열: 블로그팀 + 브랜딩팀 (총괄팀장 아래)
-  const col2Teams = ['블로그팀', '브랜딩팀']
+  // 1열 (이사 아래): 경영지원 + 상위노출팀 + 바이럴팀
+  const col1Teams = ['상위노출팀', '바이럴팀']
     .map(n => teamByName(n))
     .filter(Boolean) as Team[];
-  // 3열: 상위노출팀 + 바이럴팀
-  const col3Teams = ['상위노출팀', '바이럴팀']
+  // 2열 (총괄팀장 아래): 블로그팀 + 브랜딩팀
+  const col2Teams = ['블로그팀', '브랜딩팀']
     .map(n => teamByName(n))
     .filter(Boolean) as Team[];
   const otherTeams = data.teams.filter(t =>
@@ -298,17 +298,20 @@ export default function OrganizationPage() {
         </div>
       )}
 
-      {/* ── 이사 | 블로그팀 | 그 외 팀 — PC: 3열, 태블릿: 2열, 모바일: 1열 ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-        {/* 1열: 이사 → 경영지원 */}
+      {/* ── 이사 | 총괄팀장 — PC: 2열, 모바일: 1열 ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+        {/* 1열: 이사 → 경영지원 + 상위노출팀 + 바이럴팀 */}
         {director && (
           <div className="pl-4 border-l-2 border-blue-200">
             <ExecutiveHeader member={director} onClick={() => onClick(director)} isMe={director.id === myId} />
-            {bizSupport && (
-              <div className="mt-3">
+            <div className="mt-3 space-y-3">
+              {bizSupport && (
                 <TeamCard team={bizSupport} onMemberClick={onClick} myId={myId} />
-              </div>
-            )}
+              )}
+              {col1Teams.map(team => (
+                <TeamCard key={team.id} team={team} onMemberClick={onClick} myId={myId} />
+              ))}
+            </div>
           </div>
         )}
 
@@ -318,21 +321,6 @@ export default function OrganizationPage() {
             <ExecutiveHeader member={gm} onClick={() => onClick(gm)} isMe={gm.id === myId} />
             <div className="mt-3 space-y-3">
               {col2Teams.map(team => (
-                <TeamCard key={team.id} team={team} onMemberClick={onClick} myId={myId} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 3열: 상위노출팀 + 바이럴팀 */}
-        {col3Teams.length > 0 && gm && (
-          <div className="pl-4 border-l-2 border-indigo-200 md:col-start-2 lg:col-start-3">
-            {/* PC: 투명 헤더로 높이 맞춤 */}
-            <div className="hidden lg:block mb-3 invisible pointer-events-none" aria-hidden="true">
-              <ExecutiveHeader member={gm} onClick={() => {}} />
-            </div>
-            <div className="space-y-3">
-              {col3Teams.map(team => (
                 <TeamCard key={team.id} team={team} onMemberClick={onClick} myId={myId} />
               ))}
             </div>

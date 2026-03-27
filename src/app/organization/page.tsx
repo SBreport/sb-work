@@ -219,23 +219,33 @@ function TeamCard({ team, onMemberClick, defaultOpen = true, myId }: { team: Tea
   );
 }
 
+// 모듈 레벨 캐시 — 탭 전환 시 즉시 표시
+let orgCache: { data: OrgData; ts: number } | null = null;
+const CACHE_TTL = 60_000; // 60초
+
 /* ── 메인 페이지 ── */
 export default function OrganizationPage() {
   const { profile, viewAsId, isViewingAs } = useAuth();
-  const [data, setData] = useState<OrgData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<OrgData | null>(orgCache?.data ?? null);
+  const [loading, setLoading] = useState(!orgCache);
   const [error, setError] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const myId = (isViewingAs ? viewAsId : profile?.id) ?? undefined;
 
   useEffect(() => {
+    // 캐시가 유효하면 백그라운드에서만 갱신
+    const isFresh = orgCache && (Date.now() - orgCache.ts < CACHE_TTL);
+
     authFetch('/api/organization')
       .then(res => {
         if (!res.ok) throw new Error('조직도 데이터를 불러올 수 없습니다.');
         return res.json();
       })
-      .then(setData)
-      .catch(e => setError(e.message))
+      .then(d => {
+        orgCache = { data: d, ts: Date.now() };
+        setData(d);
+      })
+      .catch(e => { if (!isFresh) setError(e.message); })
       .finally(() => setLoading(false));
   }, []);
 

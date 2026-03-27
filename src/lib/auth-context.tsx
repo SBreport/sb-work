@@ -51,19 +51,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, fetchProfile]);
 
   useEffect(() => {
+    let initialUserId: string | null = null;
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        // profile까지 로드 완료 후 loading 해제 → 빈 화면 방지
-        await fetchProfile(session.user.id);
+      const u = session?.user ?? null;
+      initialUserId = u?.id ?? null;
+      setUser(u);
+      if (u) {
+        await fetchProfile(u.id);
       }
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
+      const u = session?.user ?? null;
+      // getSession과 동일 유저면 중복 fetch 방지
+      if (u?.id === initialUserId) return;
+      initialUserId = u?.id ?? null;
+      setUser(u);
+      if (u) {
+        fetchProfile(u.id);
       } else {
         setProfile(null);
       }

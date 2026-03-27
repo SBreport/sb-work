@@ -73,6 +73,8 @@ const ROLE_PILL: Record<string, string> = {
   '작성': 'bg-blue-50 text-blue-700 border-blue-200',
   '검토': 'bg-indigo-50 text-indigo-700 border-indigo-200',
   '부사수': 'bg-green-50 text-green-700 border-green-200',
+  '사수원고': 'bg-blue-50 text-blue-700 border-blue-200',
+  '부사수원고': 'bg-indigo-50 text-indigo-700 border-indigo-200',
   '최적배포': 'bg-purple-50 text-purple-700 border-purple-200',
   '인블': 'bg-amber-50 text-amber-700 border-amber-200',
 };
@@ -389,8 +391,8 @@ export default function FreelancerPage() {
   const isReviewer = curSummary.writing > 0 && (curSummary.review > 0 || myAssignments.some(a => a.main_writer_id === uid && a.sub_writer_id === uid && a.sub_quantity > 0));
 
   const activeRoles = [
-    curSummary.writing > 0 ? { label: '작성', qty: curSummary.writing } : null,
-    curSummary.review > 0 ? { label: '검토', qty: curSummary.review } : null,
+    curSummary.writing > 0 ? { label: '사수원고', qty: curSummary.writing } : null,
+    curSummary.review > 0 ? { label: '부사수원고', qty: curSummary.review } : null,
     curSummary.sub > 0 ? { label: '부사수', qty: curSummary.sub } : null,
     curSummary.optimal > 0 ? { label: '최적배포', qty: curSummary.optimal } : null,
     curSummary.inbl > 0 ? { label: '인블', qty: curSummary.inbl } : null,
@@ -520,17 +522,17 @@ export default function FreelancerPage() {
 
                   {hasWritingAndReview ? (
                     <>
-                      {/* 사수: 작성/검토 분리 강조 표시 */}
+                      {/* 사수: 사수원고/부사수원고 분리 강조 표시 */}
                       <div className="flex items-end gap-3 mb-1.5">
                         <div>
-                          <span className="text-[10px] text-blue-500 font-medium">작성</span>
+                          <span className="text-[10px] text-blue-500 font-medium">사수원고</span>
                           <p className="text-xl font-bold text-blue-600 leading-tight">
                             {card.writing}<span className="text-[10px] font-normal text-gray-400 ml-0.5">건</span>
                           </p>
                         </div>
                         <div className="text-gray-300 text-sm pb-0.5">+</div>
                         <div>
-                          <span className="text-[10px] text-indigo-500 font-medium">검토</span>
+                          <span className="text-[10px] text-indigo-500 font-medium">부사수원고</span>
                           <p className="text-xl font-bold text-indigo-600 leading-tight">
                             {card.review}<span className="text-[10px] font-normal text-gray-400 ml-0.5">건</span>
                           </p>
@@ -739,11 +741,8 @@ export default function FreelancerPage() {
                       <SortHeader label="지점명" sortKeyName="name" className="text-left" />
                       {isReviewer ? (
                         <>
-                          <th className="px-2 py-2 font-medium text-blue-600 text-xs whitespace-nowrap text-center w-16">작성</th>
-                          <th className="px-2 py-2 font-medium text-indigo-600 text-xs whitespace-nowrap text-center w-16">
-                            {curSummary.review > 0 && myAssignments.some(a => a.main_writer_id === uid && a.sub_writer_id === uid) ? '검토/부사수' :
-                             curSummary.review > 0 ? '검토' : '부사수'}
-                          </th>
+                          <th className="px-2 py-2 font-medium text-blue-600 text-xs whitespace-nowrap text-center w-16">사수원고</th>
+                          <th className="px-2 py-2 font-medium text-indigo-600 text-xs whitespace-nowrap text-center w-16">부사수원고</th>
                         </>
                       ) : (
                         <SortHeader label="포스팅" sortKeyName="qty" className="text-center w-16" />

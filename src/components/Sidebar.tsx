@@ -74,7 +74,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const [showEmployeeList, setShowEmployeeList] = useState(false);
   // 비밀번호 변경
   const [showPwModal, setShowPwModal] = useState(false);
-  const needsPwChange = profile?.must_change_password && profile?.role !== 'admin' && profile?.role !== 'editor';
+  // must_change_password가 명시적으로 false가 아니면 → 비밀번호 미변경자로 간주
+  const needsPwChange = profile?.must_change_password !== false && profile?.role !== 'admin' && profile?.role !== 'editor';
   const [showPwBubble, setShowPwBubble] = useState(false);
 
   // 비밀번호 변경 필요시 말풍선 표시 (최초 1회)

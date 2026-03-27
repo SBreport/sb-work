@@ -17,6 +17,7 @@ interface Member {
   team_id: string | null;
   employee_type: string;
   is_active: boolean;
+  avatar_url?: string;
 }
 
 interface Team {
@@ -38,21 +39,38 @@ function ContactModal({ member, onClose }: { member: Member; onClose: () => void
   return (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-5" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <Avatar position={member.position} mentorRole={member.mentor_role} size="lg" />
-            <div>
-              <h3 className="font-bold text-gray-900">{member.name}</h3>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                {member.position && <span className="text-xs text-gray-500">{member.position}</span>}
-                {member.mentor_role && <span className="text-xs text-gray-400">· {member.mentor_role}</span>}
-              </div>
-            </div>
-          </div>
+        {/* 닫기 버튼 */}
+        <div className="flex justify-end mb-2">
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100">
             <X size={16} className="text-gray-400" />
           </button>
         </div>
+
+        {/* 아바타 이미지 영역 */}
+        <div className="flex justify-center mb-4">
+          {member.avatar_url ? (
+            <img
+              src={member.avatar_url}
+              alt={member.name}
+              className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
+              <Avatar position={member.position} mentorRole={member.mentor_role} size="lg" />
+            </div>
+          )}
+        </div>
+
+        {/* 이름 + 직책 */}
+        <div className="text-center mb-4">
+          <h3 className="text-lg font-bold text-gray-900">{member.name}</h3>
+          <div className="flex items-center justify-center gap-1.5 mt-1">
+            {member.position && <span className="text-sm text-gray-500">{member.position}</span>}
+            {member.mentor_role && <span className="text-sm text-gray-400">· {member.mentor_role}</span>}
+          </div>
+        </div>
+
+        {/* 연락처 */}
         <div className="space-y-2.5">
           {member.phone && (
             <a href={`tel:${member.phone}`} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors">
@@ -112,13 +130,13 @@ function PersonRow({ member, onClick, isMe = false }: { member: Member; onClick:
 }
 
 /* ── 임원 헤더 (이름 + 직책, 클릭 가능) ── */
-function ExecutiveHeader({ member, onClick }: { member: Member; onClick: () => void }) {
+function ExecutiveHeader({ member, onClick, isMe = false }: { member: Member; onClick: () => void; isMe?: boolean }) {
   return (
     <button
       onClick={onClick}
       className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl hover:border-blue-300 hover:shadow-sm transition-all text-left w-full group"
     >
-      <Avatar position={member.position} mentorRole={member.mentor_role} size="lg" />
+      <Avatar position={member.position} mentorRole={member.mentor_role} size="lg" isMe={isMe} />
       <div className="min-w-0 flex-1">
         <div className="text-base font-bold text-gray-900">{member.name}</div>
         <div className="text-xs text-gray-500">{member.position}</div>
@@ -203,12 +221,12 @@ function TeamCard({ team, onMemberClick, defaultOpen = true, myId }: { team: Tea
 
 /* ── 메인 페이지 ── */
 export default function OrganizationPage() {
-  const { profile } = useAuth();
+  const { profile, viewAsId, isViewingAs } = useAuth();
   const [data, setData] = useState<OrgData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-  const myId = profile?.id;
+  const myId = (isViewingAs ? viewAsId : profile?.id) ?? undefined;
 
   useEffect(() => {
     authFetch('/api/organization')
@@ -224,7 +242,7 @@ export default function OrganizationPage() {
   if (loading) {
     return (
       <div className="p-4 md:p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">조직도</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-4">스마트브랜딩 조직도</h2>
         <div className="space-y-4">
           {[1, 2, 3].map(i => <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />)}
         </div>
@@ -235,7 +253,7 @@ export default function OrganizationPage() {
   if (error) {
     return (
       <div className="p-4 md:p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">조직도</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-4">스마트브랜딩 조직도</h2>
         <div className="text-center py-12 text-gray-500">
           <p>{error}</p>
           <button onClick={() => window.location.reload()} className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">다시 시도</button>
@@ -271,12 +289,12 @@ export default function OrganizationPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto">
-      <h2 className="text-lg font-bold text-gray-900 mb-6">조직도</h2>
+      <h2 className="text-lg font-bold text-gray-900 mb-6">스마트브랜딩 조직도</h2>
 
       {/* ── 대표 ── */}
       {ceo && (
         <div className="mb-6">
-          <ExecutiveHeader member={ceo} onClick={() => onClick(ceo)} />
+          <ExecutiveHeader member={ceo} onClick={() => onClick(ceo)} isMe={ceo.id === myId} />
         </div>
       )}
 
@@ -285,7 +303,7 @@ export default function OrganizationPage() {
         {/* 1열: 이사 → 경영지원 */}
         {director && (
           <div className="pl-4 border-l-2 border-blue-200">
-            <ExecutiveHeader member={director} onClick={() => onClick(director)} />
+            <ExecutiveHeader member={director} onClick={() => onClick(director)} isMe={director.id === myId} />
             {bizSupport && (
               <div className="mt-3">
                 <TeamCard team={bizSupport} onMemberClick={onClick} myId={myId} />
@@ -297,7 +315,7 @@ export default function OrganizationPage() {
         {/* 2열: 총괄팀장 → 블로그팀 + 브랜딩팀 */}
         {gm && (
           <div className="pl-4 border-l-2 border-indigo-200">
-            <ExecutiveHeader member={gm} onClick={() => onClick(gm)} />
+            <ExecutiveHeader member={gm} onClick={() => onClick(gm)} isMe={gm.id === myId} />
             <div className="mt-3 space-y-3">
               {col2Teams.map(team => (
                 <TeamCard key={team.id} team={team} onMemberClick={onClick} myId={myId} />

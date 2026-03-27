@@ -23,7 +23,6 @@ import {
   UserCircle,
   Handshake,
   FolderOpen,
-  ChevronsLeft,
 } from 'lucide-react';
 
 // ── 공통 메뉴: 모든 로그인 사용자 ──
@@ -52,7 +51,6 @@ const adminSubItems = [
 
 interface SidebarProps {
   onClose?: () => void;
-  onCollapse?: () => void;
 }
 
 interface WriterOption {
@@ -60,7 +58,7 @@ interface WriterOption {
   name: string;
 }
 
-export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
+export default function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { profile, signOut, isAdmin, isEditor, isEmployee, viewAsId, viewAsProfile, viewAsRole, setViewAs, isViewingAs } = useAuth();
@@ -139,7 +137,6 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
       <Link
         key={item.href}
         href={item.href}
-        onClick={handleLinkClick}
         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
           isActive
             ? 'bg-blue-50 text-blue-700'
@@ -159,25 +156,14 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
           <h1 className="text-lg font-bold text-gray-900">스마트브랜딩</h1>
           <p className="text-xs text-gray-500 mt-1">업무 관리 페이지</p>
         </div>
-        <div className="flex items-center gap-1">
-          {onCollapse && (
-            <button
-              onClick={onCollapse}
-              className="hidden md:block p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
-              title="사이드바 접기"
-            >
-              <ChevronsLeft size={20} />
-            </button>
-          )}
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="md:hidden p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
-            >
-              <X size={20} />
-            </button>
-          )}
-        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
+          >
+            <X size={20} />
+          </button>
+        )}
       </div>
 
       {/* 미리보기 모드 배너 */}

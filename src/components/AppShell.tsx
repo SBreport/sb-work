@@ -5,27 +5,22 @@ import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Sidebar from './Sidebar';
-import { Menu, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Menu } from 'lucide-react';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);      // 모바일 오버레이
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // PC 접힘
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
-    // 프리랜서 첫 로그인 시 비밀번호 변경 안내
-    // 3회까지 건너뛰기 가능, 3회 초과 시 강제
-    if (!loading && user && profile?.must_change_password && profile?.role !== 'admin' && profile?.role !== 'editor' && profile?.role !== 'employee') {
+    if (!loading && user && profile?.must_change_password && profile?.role !== 'admin' && profile?.role !== 'editor') {
       const skipCount = profile?.password_skip_count || 0;
       if (skipCount >= 3) {
-        // 3회 이상 건너뛰었으면 강제
         router.push('/force-change-password');
       } else if (typeof window !== 'undefined' && !sessionStorage.getItem('pw_skip_done') && !sessionStorage.getItem('pw_skip_shown')) {
-        // 이번 세션에서 스킵하지 않았고, 안내를 아직 안 보여줬으면 표시
         sessionStorage.setItem('pw_skip_shown', 'true');
         router.push('/force-change-password');
       }
@@ -44,38 +39,30 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen">
-      {/* 모바일 오버레이 */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* 사이드바: 데스크톱 접힘/열림, 모바일 오버레이 토글 */}
-      <div className={`
-        fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-in-out
-        md:relative md:translate-x-0
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        ${sidebarCollapsed ? 'md:hidden' : ''}
-      `}>
-        <Sidebar onClose={() => setSidebarOpen(false)} onCollapse={() => setSidebarCollapsed(true)} />
+      {/* 사이드바 — 레이아웃을 밀어내는 방식 */}
+      <div
+        className={`shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
+          sidebarOpen ? 'w-64' : 'w-0'
+        }`}
+      >
+        <div className="w-64 h-full">
+          <Sidebar onClose={() => setSidebarOpen(false)} />
+        </div>
       </div>
 
       {/* 메인 콘텐츠 */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* 헤더: 모바일 항상 표시 / PC는 접힌 상태에서만 표시 */}
-        <header className={`flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white ${sidebarCollapsed ? '' : 'md:hidden'}`}>
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* 햄버거 버튼 — 사이드바 닫혀있을 때만 */}
+        {!sidebarOpen && (
           <button
-            onClick={() => { if (sidebarCollapsed) setSidebarCollapsed(false); else setSidebarOpen(true); }}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600"
+            onClick={() => setSidebarOpen(true)}
+            className="fixed top-4 left-4 z-30 p-2 bg-white rounded-lg shadow-md hover:shadow-lg border border-gray-200 text-gray-600 hover:text-gray-900 transition-all"
           >
-            {sidebarCollapsed ? <ChevronsRight size={22} /> : <Menu size={22} />}
+            <Menu size={20} />
           </button>
-          <h1 className="text-base font-bold text-gray-900">스마트브랜딩</h1>
-        </header>
+        )}
 
-        <main className="flex-1 overflow-auto">
+        <main className={`flex-1 overflow-auto ${!sidebarOpen ? 'pl-16' : ''} transition-all duration-300`}>
           {children}
         </main>
       </div>

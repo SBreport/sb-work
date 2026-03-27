@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import Sidebar from './Sidebar';
@@ -8,15 +8,31 @@ import { FullPageSpinner } from './Spinner';
 import { Menu } from 'lucide-react';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // 화면 크기 감지: 모바일 < 768px
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    setIsMobile(!mq.matches);
+    setSidebarOpen(mq.matches);
+    const handler = (e: MediaQueryListEvent) => {
+      setIsMobile(!e.matches);
+      setSidebarOpen(e.matches);
+    };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
   if (loading) {
     return <FullPageSpinner />;
@@ -26,16 +42,39 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen">
-      {/* 사이드바 — 레이아웃을 밀어내는 방식 */}
-      <div
-        className={`shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
-          sidebarOpen ? 'w-64' : 'w-0'
-        }`}
-      >
-        <div className="w-64 h-full">
-          <Sidebar onClose={() => setSidebarOpen(false)} />
+      {/* ── 모바일: 오버레이 사이드바 ── */}
+      {isMobile && (
+        <>
+          {/* 어두운 배경 */}
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/30 z-40 transition-opacity"
+              onClick={closeSidebar}
+            />
+          )}
+          {/* 슬라이드 사이드바 */}
+          <div
+            className={`fixed inset-y-0 left-0 z-50 w-64 transition-transform duration-300 ease-in-out ${
+              sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}
+          >
+            <Sidebar onClose={closeSidebar} />
+          </div>
+        </>
+      )}
+
+      {/* ── PC: push 방식 사이드바 ── */}
+      {!isMobile && (
+        <div
+          className={`shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
+            sidebarOpen ? 'w-64' : 'w-0'
+          }`}
+        >
+          <div className="w-64 h-full">
+            <Sidebar onClose={closeSidebar} />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 메인 콘텐츠 */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -49,7 +88,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         )}
 
-        <main className={`flex-1 overflow-auto ${!sidebarOpen ? 'pl-16' : ''} transition-all duration-300`}>
+        <main className={`flex-1 overflow-auto ${!isMobile && !sidebarOpen ? 'pl-16' : ''} transition-all duration-300`}>
           {children}
         </main>
       </div>

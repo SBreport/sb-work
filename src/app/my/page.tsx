@@ -753,8 +753,8 @@ export default function FreelancerPage() {
                   <tbody>
                     {sortedAssignments.map((a, idx) => {
                       const writingRole = a.roles.find(r => r.label === '작성');
-                      // 검토(별도 부사수) 또는 부사수(겸임) 둘 다 2열에 표시
-                      const reviewRole = a.roles.find(r => r.label === '검토') || (a.main_writer_id === uid ? a.roles.find(r => r.label === '부사수') : null);
+                      // 부사수원고 컬럼: 검토(별도부사수), 겸임부사수, 순수부사수 모두 표시
+                      const reviewRole = a.roles.find(r => r.label === '검토') || a.roles.find(r => r.label === '부사수');
                       return (
                         <tr key={a.id} className={`border-b border-gray-50 hover:bg-blue-50/20 ${a.isNew ? 'bg-orange-50/60' : idx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
                           <td className="pl-4 pr-2 py-1.5 text-gray-500 text-xs whitespace-nowrap">{a.renewal_day}일</td>

@@ -108,7 +108,7 @@ interface MonthCard {
 }
 
 export default function FreelancerPage() {
-  const { user, profile, viewAsWriterId, viewAsProfile, isViewingAs } = useAuth();
+  const { user, profile, viewAsId, viewAsProfile, isViewingAs } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [month, setMonth] = useState(getCurrentMonth());
   const [monthCards, setMonthCards] = useState<MonthCard[]>([]);
@@ -125,7 +125,7 @@ export default function FreelancerPage() {
     typeof window !== 'undefined' && window.innerWidth < 640 ? 'card' : 'table'
   );
 
-  const targetUserId = isViewingAs ? viewAsWriterId : user?.id;
+  const targetUserId = isViewingAs ? viewAsId : user?.id;
   const displayName = isViewingAs ? viewAsProfile?.name : profile?.name;
 
   // 월별 카드 데이터 로드 (대시보드용)

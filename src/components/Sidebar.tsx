@@ -22,6 +22,8 @@ import {
   Settings,
   UserCircle,
   Handshake,
+  FolderOpen,
+  ChevronsLeft,
 } from 'lucide-react';
 
 // ── 공통 메뉴: 모든 로그인 사용자 ──
@@ -30,6 +32,7 @@ const commonMenuItems = [
   { href: '/organization', label: '조직도', icon: Network },
   { href: '/clients', label: '클라이언트', icon: UserCircle },
   { href: '/partners', label: '협력사', icon: Handshake },
+  { href: '/library', label: '자료실', icon: FolderOpen },
 ];
 
 // ── 프리랜서 전용 ──
@@ -44,10 +47,12 @@ const adminSubItems = [
   { href: '/admin/assignments', label: '블로그 업무 배정', icon: ClipboardList },
   { href: '/admin/writers', label: '계정 관리', icon: Users },
   { href: '/admin/branches', label: '지점 현황', icon: Building2 },
+  { href: '/admin/import', label: '데이터 가져오기', icon: FileUp },
 ];
 
 interface SidebarProps {
   onClose?: () => void;
+  onCollapse?: () => void;
 }
 
 interface WriterOption {
@@ -55,14 +60,18 @@ interface WriterOption {
   name: string;
 }
 
-export default function Sidebar({ onClose }: SidebarProps) {
+export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile, signOut, isAdmin, isEditor, isEmployee, viewAsWriterId, viewAsProfile, setViewAsWriter, isViewingAs } = useAuth();
+  const { profile, signOut, isAdmin, isEditor, isEmployee, viewAsId, viewAsProfile, viewAsRole, setViewAs, isViewingAs } = useAuth();
   const [writers, setWriters] = useState<WriterOption[]>([]);
-  const [showWriterSelect, setShowWriterSelect] = useState(false);
-  // 관리 하위메뉴: 현재 관리 페이지에 있으면 열림, 아니면 닫힘
+  const [employees, setEmployees] = useState<WriterOption[]>([]);
+  // 관리 하위메뉴
   const [managementOpen, setManagementOpen] = useState(false);
+  // 미리보기 하위메뉴
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [showFreelancerList, setShowFreelancerList] = useState(false);
+  const [showEmployeeList, setShowEmployeeList] = useState(false);
 
   // 현재 관리 페이지에 있으면 자동으로 열기
   useEffect(() => {
@@ -70,11 +79,11 @@ export default function Sidebar({ onClose }: SidebarProps) {
     if (isOnAdminSub) setManagementOpen(true);
   }, [pathname]);
 
-  // 관리자일 때 프리랜서 목록 로드 (한 번만)
-  const writersFetched = useRef(false);
+  // 관리자일 때 프리랜서 + 직원 목록 로드 (한 번만)
+  const listsFetched = useRef(false);
   useEffect(() => {
-    if (!isAdmin || writersFetched.current) return;
-    writersFetched.current = true;
+    if (!isAdmin || listsFetched.current) return;
+    listsFetched.current = true;
     supabase
       .from('profiles')
       .select('id, name')
@@ -82,17 +91,33 @@ export default function Sidebar({ onClose }: SidebarProps) {
       .eq('is_active', true)
       .order('name')
       .then(({ data }) => setWriters(data || []));
+    supabase
+      .from('profiles')
+      .select('id, name')
+      .eq('role', 'employee')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => setEmployees(data || []));
   }, [isAdmin]);
 
-  const handleViewAs = (writerId: string) => {
-    setViewAsWriter(writerId);
-    setShowWriterSelect(false);
+  const handleViewAsFreelancer = (id: string) => {
+    setViewAs(id, 'freelancer');
+    setShowFreelancerList(false);
+    setPreviewOpen(false);
     router.push('/my');
     onClose?.();
   };
 
+  const handleViewAsEmployee = (id: string) => {
+    setViewAs(id, 'employee');
+    setShowEmployeeList(false);
+    setPreviewOpen(false);
+    router.push('/notices');
+    onClose?.();
+  };
+
   const handleExitViewAs = () => {
-    setViewAsWriter(null);
+    setViewAs(null);
     router.push('/admin/dashboard');
     onClose?.();
   };
@@ -127,9 +152,6 @@ export default function Sidebar({ onClose }: SidebarProps) {
     );
   };
 
-  // editor는 데이터 가져오기 숨김
-  const showImport = isAdmin && !isEditor;
-
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
       <div className="p-6 border-b border-gray-200 flex items-center justify-between">
@@ -137,22 +159,35 @@ export default function Sidebar({ onClose }: SidebarProps) {
           <h1 className="text-lg font-bold text-gray-900">스마트브랜딩</h1>
           <p className="text-xs text-gray-500 mt-1">업무 관리 페이지</p>
         </div>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="md:hidden p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
-          >
-            <X size={20} />
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {onCollapse && (
+            <button
+              onClick={onCollapse}
+              className="hidden md:block p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
+              title="사이드바 접기"
+            >
+              <ChevronsLeft size={20} />
+            </button>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="md:hidden p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
+            >
+              <X size={20} />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* 프리랜서 미리보기 모드 배너 */}
+      {/* 미리보기 모드 배너 */}
       {isInViewMode && (
         <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
           <div className="flex items-center gap-2 mb-2">
             <Eye size={14} className="text-amber-600" />
-            <span className="text-xs font-semibold text-amber-700">미리보기 모드</span>
+            <span className="text-xs font-semibold text-amber-700">
+              {viewAsRole === 'freelancer' ? '프리랜서' : '직원'} 미리보기
+            </span>
           </div>
           <p className="text-sm font-bold text-amber-900">{viewAsProfile?.name || '로딩 중...'}</p>
           <button
@@ -170,7 +205,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
         {commonMenuItems.map(renderMenuItem)}
 
         {/* ── 프리랜서 전용: 내 업무 ── */}
-        {(isFreelancer || isInViewMode) && freelancerExtraItems.map(renderMenuItem)}
+        {(isFreelancer || (isInViewMode && viewAsRole === 'freelancer')) && freelancerExtraItems.map(renderMenuItem)}
 
         {/* ── 관리자 메뉴 (admin/editor, 미리보기 모드가 아닐 때) ── */}
         {isAdmin && !isInViewMode && (
@@ -216,35 +251,77 @@ export default function Sidebar({ onClose }: SidebarProps) {
               </div>
             )}
 
-            {/* 데이터 가져오기 (admin만) */}
-            {showImport && renderMenuItem({ href: '/admin/import', label: '데이터 가져오기', icon: FileUp })}
           </>
         )}
 
-        {/* 관리자: 프리랜서 화면 보기 */}
+        {/* 관리자: 미리보기 */}
         {isAdmin && !isInViewMode && (
           <div className="pt-3 mt-3 border-t border-gray-200">
             <button
-              onClick={() => setShowWriterSelect(!showWriterSelect)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 w-full transition-colors"
+              onClick={() => { setPreviewOpen(!previewOpen); setShowFreelancerList(false); setShowEmployeeList(false); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                previewOpen ? 'text-blue-700 bg-blue-50' : 'text-gray-600 hover:bg-gray-100'
+              }`}
             >
               <Eye size={18} />
-              프리랜서 화면 보기
+              <span className="flex-1 text-left">미리보기</span>
+              <ChevronDown size={14} className={`transition-transform ${previewOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {showWriterSelect && (
-              <div className="mt-2 max-h-48 overflow-y-auto bg-gray-50 rounded-lg border border-gray-200">
-                {writers.map(w => (
-                  <button
-                    key={w.id}
-                    onClick={() => handleViewAs(w.id)}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors border-b border-gray-100 last:border-0"
-                  >
-                    {w.name}
-                  </button>
-                ))}
-                {writers.length === 0 && (
-                  <p className="px-3 py-2 text-xs text-gray-400">등록된 프리랜서가 없습니다.</p>
+            {previewOpen && (
+              <div className="ml-4 pl-3 border-l-2 border-gray-100 space-y-0.5 mt-1">
+                {/* 프리랜서 미리보기 */}
+                <button
+                  onClick={() => { setShowFreelancerList(!showFreelancerList); setShowEmployeeList(false); }}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+                    showFreelancerList ? 'text-blue-700 font-semibold bg-blue-50' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                  }`}
+                >
+                  <Briefcase size={15} />
+                  프리랜서 미리보기
+                </button>
+                {showFreelancerList && (
+                  <div className="ml-2 max-h-32 overflow-y-auto bg-gray-50 rounded-lg border border-gray-200">
+                    {writers.map(w => (
+                      <button
+                        key={w.id}
+                        onClick={() => handleViewAsFreelancer(w.id)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors border-b border-gray-100 last:border-0"
+                      >
+                        {w.name}
+                      </button>
+                    ))}
+                    {writers.length === 0 && (
+                      <p className="px-3 py-2 text-xs text-gray-400">등록된 프리랜서가 없습니다.</p>
+                    )}
+                  </div>
+                )}
+
+                {/* 직원용 미리보기 */}
+                <button
+                  onClick={() => { setShowEmployeeList(!showEmployeeList); setShowFreelancerList(false); }}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+                    showEmployeeList ? 'text-blue-700 font-semibold bg-blue-50' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                  }`}
+                >
+                  <Users size={15} />
+                  직원용 미리보기
+                </button>
+                {showEmployeeList && (
+                  <div className="ml-2 max-h-32 overflow-y-auto bg-gray-50 rounded-lg border border-gray-200">
+                    {employees.map(e => (
+                      <button
+                        key={e.id}
+                        onClick={() => handleViewAsEmployee(e.id)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors border-b border-gray-100 last:border-0"
+                      >
+                        {e.name}
+                      </button>
+                    ))}
+                    {employees.length === 0 && (
+                      <p className="px-3 py-2 text-xs text-gray-400">등록된 직원이 없습니다.</p>
+                    )}
+                  </div>
                 )}
               </div>
             )}

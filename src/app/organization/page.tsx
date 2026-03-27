@@ -85,11 +85,11 @@ function Avatar({ position, mentorRole, size = 'sm', isMe = false }: { position?
     '팀장': { abbr: '팀장', bg: 'bg-sky-600', text: 'text-white' },
     '사수': { abbr: '사수', bg: 'bg-emerald-600', text: 'text-white' },
     '부사수': { abbr: '부사', bg: 'bg-amber-500', text: 'text-white' },
-    '팀원': { abbr: '팀원', bg: 'bg-gray-200', text: 'text-gray-600' },
+    '팀원': { abbr: '팀원', bg: 'bg-purple-200', text: 'text-purple-700' },
   };
   const c = config[label] || { abbr: label?.slice(0, 2) || '·', bg: 'bg-gray-200', text: 'text-gray-500' };
   const sizeClass = size === 'lg' ? 'w-10 h-10 text-xs' : 'w-7 h-7 text-[10px]';
-  const shimmer = isMe && position === '팀장' ? 'avatar-shimmer' : '';
+  const shimmer = isMe ? 'avatar-shimmer' : '';
 
   return (
     <div className={`${sizeClass} rounded-full ${c.bg} ${c.text} flex items-center justify-center font-bold shrink-0 relative overflow-hidden ${shimmer}`}>
@@ -103,11 +103,10 @@ function PersonRow({ member, onClick, isMe = false }: { member: Member; onClick:
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors text-left group"
+      className="w-full flex items-center gap-1.5 px-1.5 py-1 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors text-left group"
     >
       <Avatar position={member.position} mentorRole={member.mentor_role} isMe={isMe} />
-      <span className="text-sm text-gray-900 font-medium flex-1 min-w-0 truncate">{member.name}</span>
-      <Phone size={11} className="text-gray-200 group-hover:text-blue-400 shrink-0 transition-colors" />
+      <span className="text-[13px] text-gray-900 font-medium whitespace-nowrap">{member.name}</span>
     </button>
   );
 }
@@ -169,7 +168,7 @@ function TeamCard({ team, onMemberClick, defaultOpen = true, myId }: { team: Tea
           {mentors.length > 0 && (
             <div className="mb-1">
               <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold text-emerald-600 tracking-wider">사수 {mentors.length}</div>
-              <div className="grid grid-cols-2 gap-x-1">
+              <div className="grid grid-cols-2 gap-x-0">
                 {mentors.map(m => <PersonRow key={m.id} member={m} onClick={() => onMemberClick(m)} isMe={m.id === myId} />)}
               </div>
             </div>
@@ -178,7 +177,7 @@ function TeamCard({ team, onMemberClick, defaultOpen = true, myId }: { team: Tea
           {mentees.length > 0 && (
             <div className="mb-1">
               <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold text-amber-600 tracking-wider">부사수 {mentees.length}</div>
-              <div className="grid grid-cols-2 gap-x-1">
+              <div className="grid grid-cols-2 gap-x-0">
                 {mentees.map(m => <PersonRow key={m.id} member={m} onClick={() => onMemberClick(m)} isMe={m.id === myId} />)}
               </div>
             </div>

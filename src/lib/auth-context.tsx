@@ -5,6 +5,8 @@ import { supabase } from './supabase';
 import type { User as AppUser } from '@/types/database';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
+type ViewAsRole = 'freelancer' | 'employee' | null;
+
 interface AuthContextType {
   user: SupabaseUser | null;
   profile: AppUser | null;
@@ -15,10 +17,11 @@ interface AuthContextType {
   isEditor: boolean;
   isEmployee: boolean;
   refreshProfile: () => Promise<void>;
-  // 관리자 모드 전환
-  viewAsWriterId: string | null;
+  // 미리보기 모드
+  viewAsId: string | null;
   viewAsProfile: AppUser | null;
-  setViewAsWriter: (writerId: string | null) => void;
+  viewAsRole: ViewAsRole;
+  setViewAs: (id: string | null, role?: ViewAsRole) => void;
   isViewingAs: boolean;
 }
 
@@ -28,8 +31,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [viewAsWriterId, setViewAsWriterId] = useState<string | null>(null);
+  const [viewAsId, setViewAsIdState] = useState<string | null>(null);
   const [viewAsProfile, setViewAsProfile] = useState<AppUser | null>(null);
+  const [viewAsRole, setViewAsRole] = useState<ViewAsRole>(null);
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data } = await supabase
@@ -67,19 +71,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, [fetchProfile]);
 
-  // viewAs 프리랜서 프로필 로드
+  // viewAs 프로필 로드
   useEffect(() => {
-    if (!viewAsWriterId) {
+    if (!viewAsId) {
       setViewAsProfile(null);
       return;
     }
     supabase
       .from('profiles')
       .select('*')
-      .eq('id', viewAsWriterId)
+      .eq('id', viewAsId)
       .single()
       .then(({ data }) => setViewAsProfile(data));
-  }, [viewAsWriterId]);
+  }, [viewAsId]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -87,16 +91,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    setViewAsWriterId(null);
+    setViewAsIdState(null);
+    setViewAsRole(null);
     setViewAsProfile(null);
     await supabase.auth.signOut();
     setProfile(null);
   };
 
-  const setViewAsWriter = (writerId: string | null) => {
-    // 관리자/편집자만 사용 가능
+  const setViewAs = (id: string | null, role: ViewAsRole = null) => {
     if (profile?.role !== 'admin' && profile?.role !== 'editor') return;
-    setViewAsWriterId(writerId);
+    setViewAsIdState(id);
+    setViewAsRole(id ? role : null);
   };
 
   return (
@@ -110,10 +115,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isEditor: profile?.role === 'editor',
       isEmployee: profile?.role === 'employee',
       refreshProfile,
-      viewAsWriterId,
+      viewAsId,
       viewAsProfile,
-      setViewAsWriter,
-      isViewingAs: !!viewAsWriterId,
+      viewAsRole,
+      setViewAs,
+      isViewingAs: !!viewAsId,
     }}>
       {children}
     </AuthContext.Provider>

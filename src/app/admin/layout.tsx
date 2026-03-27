@@ -6,15 +6,15 @@ import { useEffect } from 'react';
 import AppShell from '@/components/AppShell';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { profile, loading, isAdmin, isViewingAs } = useAuth();
+  const { profile, loading, isAdmin, isViewingAs, viewAsRole } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (loading || !profile) return;
 
-    // 미리보기 모드일 때는 프리랜서 페이지로
+    // 미리보기 모드일 때 역할별 리다이렉트
     if (isAdmin && isViewingAs) {
-      router.replace('/my');
+      router.replace(viewAsRole === 'freelancer' ? '/my' : '/notices');
       return;
     }
 

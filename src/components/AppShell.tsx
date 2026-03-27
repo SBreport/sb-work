@@ -5,12 +5,13 @@ import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Sidebar from './Sidebar';
-import { Menu } from 'lucide-react';
+import { Menu, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);      // 모바일 오버레이
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // PC 접힘
 
   useEffect(() => {
     if (!loading && !user) {
@@ -51,24 +52,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* 사이드바: 데스크톱 항상 표시, 모바일 토글 */}
+      {/* 사이드바: 데스크톱 접힘/열림, 모바일 오버레이 토글 */}
       <div className={`
         fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-in-out
         md:relative md:translate-x-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        ${sidebarCollapsed ? 'md:hidden' : ''}
       `}>
-        <Sidebar onClose={() => setSidebarOpen(false)} />
+        <Sidebar onClose={() => setSidebarOpen(false)} onCollapse={() => setSidebarCollapsed(true)} />
       </div>
 
       {/* 메인 콘텐츠 */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* 모바일 헤더 */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white">
+        {/* 헤더: 모바일 항상 표시 / PC는 접힌 상태에서만 표시 */}
+        <header className={`flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white ${sidebarCollapsed ? '' : 'md:hidden'}`}>
           <button
-            onClick={() => setSidebarOpen(true)}
+            onClick={() => { if (sidebarCollapsed) setSidebarCollapsed(false); else setSidebarOpen(true); }}
             className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600"
           >
-            <Menu size={22} />
+            {sidebarCollapsed ? <ChevronsRight size={22} /> : <Menu size={22} />}
           </button>
           <h1 className="text-base font-bold text-gray-900">스마트브랜딩</h1>
         </header>

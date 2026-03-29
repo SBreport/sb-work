@@ -206,7 +206,9 @@ function TeamCard({ team, onMemberClick, defaultOpen = true, myId }: { team: Tea
               {(leader || mentors.length > 0 || mentees.length > 0) && (
                 <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold text-gray-400 tracking-wider">팀원 {others.length}</div>
               )}
-              {others.map(m => <PersonRow key={m.id} member={m} onClick={() => onMemberClick(m)} isMe={m.id === myId} />)}
+              <div className="grid grid-cols-2 gap-x-0">
+                {others.map(m => <PersonRow key={m.id} member={m} onClick={() => onMemberClick(m)} isMe={m.id === myId} />)}
+              </div>
             </div>
           )}
 

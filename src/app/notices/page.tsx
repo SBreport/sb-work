@@ -33,7 +33,7 @@ export default function PublicNoticesPage() {
   useEffect(() => { fetchNotices(); }, [fetchNotices]);
 
   return (
-    <div className="p-4 max-w-[900px]">
+    <div className="p-4 max-w-[900px] mx-auto">
       <h2 className="text-lg font-bold text-gray-900 mb-4">공지사항</h2>
 
       {loading ? (

@@ -464,7 +464,7 @@ export default function FreelancerPage() {
   if (!selectedMonth) {
 
     return (
-      <div className="p-3 sm:p-4 max-w-[960px]">
+      <div className="p-3 sm:p-4 max-w-[960px] mx-auto">
         <div className="mb-4">
           <h2 className="text-base sm:text-lg font-bold text-gray-900">
             {displayName || '담당자'}님, 안녕하세요
@@ -596,7 +596,7 @@ export default function FreelancerPage() {
 
   // === 상세 뷰 ===
   return (
-    <div className="p-3 sm:p-4 max-w-[960px]">
+    <div className="p-3 sm:p-4 max-w-[960px] mx-auto">
       {/* 헤더 - 뒤로가기 추가 */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">

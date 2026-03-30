@@ -94,7 +94,7 @@ export default function NoticesPage() {
   };
 
   return (
-    <div className="p-4 max-w-[900px]">
+    <div className="p-4 max-w-[900px] mx-auto">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-gray-900">공지사항 관리</h2>
         <button

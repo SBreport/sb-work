@@ -165,7 +165,7 @@ export default function ImportPage() {
   };
 
   return (
-    <div className="p-4 max-w-[1000px]">
+    <div className="p-4 max-w-[1000px] mx-auto">
       <h2 className="text-lg font-bold text-gray-900 mb-1">CSV 데이터 가져오기</h2>
       <p className="text-xs text-gray-500 mb-4">
         구글 시트에서 월별 탭을 CSV로 다운로드 → 여러 파일을 한번에 업로드

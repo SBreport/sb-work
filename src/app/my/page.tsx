@@ -796,7 +796,7 @@ export default function FreelancerPage() {
                               {a.totalQty > 0 ? (
                                 <span className="font-bold text-sm text-gray-900">{a.totalQty}</span>
                               ) : (
-                                <span className="text-red-500 text-xs font-semibold">확인</span>
+                                <span className="font-bold text-sm text-red-500">0</span>
                               )}
                             </td>
                           )}
@@ -839,7 +839,7 @@ export default function FreelancerPage() {
                           ) : a.totalQty > 0 ? (
                             <p className="text-lg font-bold text-gray-900">{a.totalQty}<span className="text-xs font-normal text-gray-400 ml-0.5">건</span></p>
                           ) : (
-                            <p className="text-xs font-semibold text-red-500">확인 필요</p>
+                            <p className="text-lg font-bold text-red-500">0<span className="text-xs font-normal text-gray-400 ml-0.5">건</span></p>
                           )}
                         </div>
                       </div>

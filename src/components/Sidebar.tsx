@@ -129,10 +129,6 @@ export default function Sidebar({ onClose }: SidebarProps) {
     onClose?.();
   };
 
-  const handleLinkClick = () => {
-    onClose?.();
-  };
-
   // 프리랜서 여부 (admin, editor, employee가 아닌 경우)
   const isFreelancer = !isAdmin && !isEmployee;
 
@@ -231,7 +227,6 @@ export default function Sidebar({ onClose }: SidebarProps) {
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={handleLinkClick}
                       className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${
                         isActive
                           ? 'text-blue-700 font-semibold bg-blue-50'

@@ -120,13 +120,11 @@ export default function Sidebar({ onClose }: SidebarProps) {
     setShowEmployeeList(false);
     setPreviewOpen(false);
     router.push(redirectTo);
-    onClose?.();
   };
 
   const handleExitViewAs = () => {
     setViewAs(null);
     router.push('/admin/dashboard');
-    onClose?.();
   };
 
   // 프리랜서 여부 (admin, editor, employee가 아닌 경우)

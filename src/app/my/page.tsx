@@ -778,14 +778,14 @@ export default function FreelancerPage() {
                             <>
                               <td className="px-2 py-1.5 text-center">
                                 {writingRole ? (
-                                  <span className="font-bold text-sm text-blue-600">{writingRole.qty}</span>
+                                  <span className={`font-bold text-sm ${writingRole.qty > 0 ? 'text-blue-600' : 'text-red-500'}`}>{writingRole.qty}</span>
                                 ) : (
                                   <span className="text-gray-300">-</span>
                                 )}
                               </td>
                               <td className="px-2 py-1.5 text-center">
                                 {reviewRole ? (
-                                  <span className={`font-bold text-sm ${reviewRole.label === ROLE.SUB ? 'text-green-600' : 'text-indigo-600'}`}>{reviewRole.qty}</span>
+                                  <span className={`font-bold text-sm ${reviewRole.qty > 0 ? (reviewRole.label === ROLE.SUB ? 'text-green-600' : 'text-indigo-600') : 'text-red-500'}`}>{reviewRole.qty}</span>
                                 ) : (
                                   <span className="text-gray-300">-</span>
                                 )}

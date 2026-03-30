@@ -18,6 +18,7 @@ interface Member {
   employee_type: string;
   is_active: boolean;
   avatar_url?: string;
+  bio?: string;
 }
 
 interface Team {
@@ -69,6 +70,11 @@ function ContactModal({ member, onClose }: { member: Member; onClose: () => void
             {member.mentor_role && <span className="text-sm text-gray-400">· {member.mentor_role}</span>}
           </div>
         </div>
+
+        {/* 담당 업무 */}
+        {member.bio && (
+          <p className="text-sm text-gray-500 text-center mb-4">{member.bio}</p>
+        )}
 
         {/* 연락처 */}
         <div className="space-y-2.5">
@@ -235,8 +241,12 @@ export default function OrganizationPage() {
   const myId = (isViewingAs ? viewAsId : profile?.id) ?? undefined;
 
   useEffect(() => {
-    // 캐시가 유효하면 백그라운드에서만 갱신
     const isFresh = orgCache && (Date.now() - orgCache.ts < CACHE_TTL);
+    // 캐시가 유효하면 API 호출 생략
+    if (isFresh) {
+      setLoading(false);
+      return;
+    }
 
     authFetch('/api/organization')
       .then(res => {
@@ -247,7 +257,7 @@ export default function OrganizationPage() {
         orgCache = { data: d, ts: Date.now() };
         setData(d);
       })
-      .catch(e => { if (!isFresh) setError(e.message); })
+      .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 

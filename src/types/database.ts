@@ -37,10 +37,14 @@ export interface Team {
 
 export interface Branch {
   id: string;
-  name: string;       // 지점명 (유앤아이 광명, 로벨의원 등)
-  category: string;    // 과목 태그 (피부과, 내과, 성형외과 등)
-  product_type: string; // 유형 태그 (유앤아이, 로컬, 솔루션 등)
+  name: string;            // 지점명 (유앤아이 광명, 로벨의원 등)
+  category: string;         // 과목 태그 (피부과, 내과, 성형외과 등)
+  product_type: string;     // 유형 태그 (유앤아이, 로컬, 솔루션, 대행 등)
   status: 'active' | 'terminated';
+  renewal_day?: number;     // 갱신일 (1~31)
+  start_date?: string;      // 작업 시작일 (YYYY-MM-DD)
+  contract_type?: string;   // 계약 방식 (월정액, 건당 등)
+  memo?: string;            // 비고/메모
   created_at: string;
 }
 

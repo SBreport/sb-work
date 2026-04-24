@@ -8,11 +8,15 @@ export async function POST(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const supabase = createServerSupabase();
-  const { name, email, phone, password } = await request.json();
+  const { name, email, phone, password, role } = await request.json();
 
   if (!name || !email) {
     return NextResponse.json({ error: '이름과 이메일은 필수입니다.' }, { status: 400 });
   }
+
+  // 소속 (role): employee | freelancer (기본 freelancer)
+  const finalRole: 'employee' | 'freelancer' = role === 'employee' ? 'employee' : 'freelancer';
+  const finalEmployeeType: 'internal' | 'freelancer' = finalRole === 'employee' ? 'internal' : 'freelancer';
 
   // 비밀번호: 직접 입력 > 핸드폰 뒷4자리에 sb prefix 붙여 자동 설정
   let initialPassword = password;
@@ -20,7 +24,7 @@ export async function POST(request: NextRequest) {
     const digits = phone.replace(/\D/g, '');
     const last4 = digits.slice(-4);
     if (last4.length === 4) {
-      initialPassword = `sb${last4}`; // 예: sb1234 (6자)
+      initialPassword = `sb${last4}`;
     }
   }
   if (!initialPassword || initialPassword.length < 6) {
@@ -31,7 +35,7 @@ export async function POST(request: NextRequest) {
     email,
     password: initialPassword,
     email_confirm: true,
-    user_metadata: { name, role: 'freelancer' },
+    user_metadata: { name, role: finalRole },
   });
 
   if (error) {
@@ -39,7 +43,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (data.user) {
-    const profileUpdates: Record<string, unknown> = { must_change_password: true };
+    // role/employee_type/phone/must_change_password 일괄 보정
+    const profileUpdates: Record<string, unknown> = {
+      role: finalRole,
+      employee_type: finalEmployeeType,
+      must_change_password: true,
+    };
     if (phone) profileUpdates.phone = phone;
     await supabase.from('profiles').update(profileUpdates).eq('id', data.user.id);
   }
@@ -53,7 +62,7 @@ export async function PATCH(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const supabase = createServerSupabase();
-  const { id, name, phone, contract_type, is_active, contract_start, contract_end, reset_password } = await request.json();
+  const { id, name, phone, contract_type, is_active, contract_start, contract_end, reset_password, role } = await request.json();
 
   if (!id) {
     return NextResponse.json({ error: 'ID가 필요합니다.' }, { status: 400 });
@@ -67,6 +76,14 @@ export async function PATCH(request: NextRequest) {
   if (is_active !== undefined) updates.is_active = is_active;
   if (contract_start !== undefined) updates.contract_start = contract_start;
   if (contract_end !== undefined) updates.contract_end = contract_end;
+
+  // role 변경 시 employee_type도 동기화 (employee→internal, freelancer→freelancer)
+  if (role !== undefined) {
+    if (role === 'employee' || role === 'freelancer') {
+      updates.role = role;
+      updates.employee_type = role === 'employee' ? 'internal' : 'freelancer';
+    }
+  }
 
   if (Object.keys(updates).length > 0) {
     await supabase.from('profiles').update(updates).eq('id', id);

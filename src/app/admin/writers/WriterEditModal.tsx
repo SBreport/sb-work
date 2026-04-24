@@ -15,7 +15,7 @@ export default function WriterEditModal({ writer, onClose, onSave }: Props) {
   const [form, setForm] = useState({
     name: writer.name,
     phone: writer.phone || '',
-    contract_type: writer.contract_type || 'freelancer',
+    role: (writer.role === 'employee' ? 'employee' : 'freelancer') as 'employee' | 'freelancer',
     is_active: writer.is_active,
     contract_start: writer.contract_start || '',
     contract_end: writer.contract_end || '',
@@ -35,7 +35,7 @@ export default function WriterEditModal({ writer, onClose, onSave }: Props) {
         id: writer.id,
         name: form.name,
         phone: form.phone,
-        contract_type: form.contract_type,
+        role: form.role,
         is_active: form.is_active,
         contract_start: form.contract_start || null,
         contract_end: form.contract_end || null,
@@ -109,17 +109,18 @@ export default function WriterEditModal({ writer, onClose, onSave }: Props) {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* 계약형태 */}
+            {/* 소속 (role) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">계약형태</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">소속</label>
               <select
-                value={form.contract_type}
-                onChange={(e) => setForm({ ...form, contract_type: e.target.value as 'freelancer' | 'business' })}
+                value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value as 'employee' | 'freelancer' })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               >
+                <option value="employee">직원</option>
                 <option value="freelancer">프리랜서</option>
-                <option value="business">개인사업자</option>
               </select>
+              <p className="text-xs text-gray-400 mt-1">변경 시 조직도/미리보기 분류도 함께 갱신됩니다.</p>
             </div>
 
             {/* 상태 */}

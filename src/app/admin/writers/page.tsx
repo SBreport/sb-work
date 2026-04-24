@@ -14,7 +14,8 @@ export default function WritersPage() {
   const [loading, setLoading] = useState(true);
   const [editingWriter, setEditingWriter] = useState<User | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [newWriter, setNewWriter] = useState({ name: '', email: '', phone: '', password: '' });
+  const [newWriter, setNewWriter] = useState({ name: '', email: '', phone: '', password: '', role: 'freelancer' as 'employee' | 'freelancer' });
+  const [filter, setFilter] = useState<'all' | 'employee' | 'freelancer'>('all');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [rematching, setRematching] = useState(false);
@@ -67,7 +68,7 @@ export default function WritersPage() {
       const data = await res.json();
       setError(data.error || '계정 생성에 실패했습니다.');
     } else {
-      setNewWriter({ name: '', email: '', phone: '', password: '' });
+      setNewWriter({ name: '', email: '', phone: '', password: '', role: 'freelancer' });
       setShowAdd(false);
       fetchWriters();
     }
@@ -129,7 +130,7 @@ export default function WritersPage() {
       {showAdd && !isEditor && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">새 담당자 계정 생성</h3>
-          <form onSubmit={handleAddWriter} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <form onSubmit={handleAddWriter} className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <input
               type="text"
               placeholder="이름"
@@ -153,6 +154,14 @@ export default function WritersPage() {
               onChange={(e) => setNewWriter({ ...newWriter, phone: e.target.value })}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
             />
+            <select
+              value={newWriter.role}
+              onChange={(e) => setNewWriter({ ...newWriter, role: e.target.value as 'employee' | 'freelancer' })}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+            >
+              <option value="freelancer">프리랜서</option>
+              <option value="employee">직원</option>
+            </select>
             <input
               type="text"
               placeholder="초기 비밀번호"
@@ -176,6 +185,27 @@ export default function WritersPage() {
         </div>
       )}
 
+      {/* 필터 탭 */}
+      <div className="flex gap-1 mb-3">
+        {(['all', 'employee', 'freelancer'] as const).map(f => {
+          const counts = {
+            all: writers.length,
+            employee: writers.filter(w => w.role === 'employee').length,
+            freelancer: writers.filter(w => w.role === 'freelancer').length,
+          };
+          const labels = { all: '전체', employee: '직원', freelancer: '프리랜서' };
+          return (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${filter === f ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              {labels[f]} <span className="ml-0.5 opacity-70">{counts[f]}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* 담당자 목록 */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
@@ -184,7 +214,7 @@ export default function WritersPage() {
               <th className="px-6 py-3 text-left font-medium text-gray-600">이름</th>
               <th className="px-6 py-3 text-left font-medium text-gray-600">이메일</th>
               <th className="px-6 py-3 text-left font-medium text-gray-600">전화번호</th>
-              <th className="px-6 py-3 text-center font-medium text-gray-600">계약형태</th>
+              <th className="px-6 py-3 text-center font-medium text-gray-600">소속</th>
               <th className="px-6 py-3 text-center font-medium text-gray-600">상태</th>
               <th className="px-6 py-3 text-center font-medium text-gray-600">관리</th>
             </tr>
@@ -192,10 +222,10 @@ export default function WritersPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">로딩 중...</td></tr>
-            ) : writers.length === 0 ? (
+            ) : writers.filter(w => filter === 'all' ? true : w.role === filter).length === 0 ? (
               <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">등록된 담당자가 없습니다.</td></tr>
             ) : (
-              writers.map((w) => (
+              writers.filter(w => filter === 'all' ? true : w.role === filter).map((w) => (
                 <tr key={w.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="px-6 py-3 font-medium">{w.name}</td>
                   <td className="px-6 py-3 text-gray-500">{w.email}</td>
@@ -205,14 +235,10 @@ export default function WritersPage() {
                       <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">관리자</span>
                     ) : w.role === 'editor' ? (
                       <span className="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">편집자</span>
+                    ) : w.role === 'employee' ? (
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">직원</span>
                     ) : (
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        w.contract_type === 'business'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}>
-                        {w.contract_type === 'business' ? '개인사업자' : '프리랜서'}
-                      </span>
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">프리랜서</span>
                     )}
                   </td>
                   <td className="px-6 py-3 text-center">

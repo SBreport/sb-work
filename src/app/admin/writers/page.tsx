@@ -5,7 +5,7 @@ import { authFetch } from '@/lib/api-client';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { User } from '@/types/database';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, RefreshCw } from 'lucide-react';
 import WriterEditModal from './WriterEditModal';
 
 export default function WritersPage() {
@@ -17,6 +17,26 @@ export default function WritersPage() {
   const [newWriter, setNewWriter] = useState({ name: '', email: '', phone: '', password: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [rematching, setRematching] = useState(false);
+  const [rematchResult, setRematchResult] = useState<{ matched: number; unmatched: string[] } | null>(null);
+
+  const handleRematch = async () => {
+    if (rematching) return;
+    setRematching(true);
+    setRematchResult(null);
+    try {
+      const res = await authFetch('/api/writers/rematch', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setRematchResult({ matched: data.matched, unmatched: data.unmatched || [] });
+      } else {
+        setError(data.error || '갱신 실패');
+      }
+    } catch {
+      setError('갱신 중 오류가 발생했습니다.');
+    }
+    setRematching(false);
+  };
 
   const fetchWriters = async () => {
     setLoading(true);
@@ -64,15 +84,46 @@ export default function WritersPage() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-gray-900">담당자 관리</h2>
         {!isEditor && (
-          <button
-            onClick={() => setShowAdd(!showAdd)}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <Plus size={16} />
-            담당자 추가
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRematch}
+              disabled={rematching}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              title="배정 데이터의 미매칭 담당자를 이름 기준으로 자동 매칭합니다"
+            >
+              <RefreshCw size={14} className={rematching ? 'animate-spin' : ''} />
+              {rematching ? '갱신 중...' : '담당자 갱신'}
+            </button>
+            <button
+              onClick={() => setShowAdd(!showAdd)}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <Plus size={16} />
+              담당자 추가
+            </button>
+          </div>
         )}
       </div>
+
+      {/* 갱신 결과 알림 */}
+      {rematchResult && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="font-semibold text-blue-700">{rematchResult.matched}건 매칭 완료</span>
+              {rematchResult.unmatched.length > 0 && (
+                <span className="ml-2 text-gray-600">
+                  · 여전히 미매칭: <span className="font-medium text-orange-600">{rematchResult.unmatched.join(', ')}</span>
+                </span>
+              )}
+              {rematchResult.matched === 0 && rematchResult.unmatched.length === 0 && (
+                <span className="ml-2 text-gray-500">매칭할 항목이 없습니다.</span>
+              )}
+            </div>
+            <button onClick={() => setRematchResult(null)} className="text-gray-400 hover:text-gray-600 text-xs">닫기</button>
+          </div>
+        </div>
+      )}
 
       {/* 추가 폼 */}
       {showAdd && !isEditor && (

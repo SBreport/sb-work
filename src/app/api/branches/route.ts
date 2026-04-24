@@ -23,8 +23,9 @@ export async function GET(request: NextRequest) {
       .order('name'),
     supabase
       .from('assignments')
-      .select('id, branch_id, main_writer_name, main_quantity, sub_writer_name, sub_quantity, optimal_writer_name, optimal_quantity, inbl_writer_name, inbl_quantity, renewal_day, status, note, product_type')
-      .eq('month', month),
+      .select('id, branch_id, main_writer_name, main_quantity, sub_writer_name, sub_quantity, optimal_writer_name, optimal_quantity, inbl_writer_name, inbl_quantity, renewal_day, status, note, product_type, operation_type, partner_id, slot, partner:partners(id, name, partner_type, kakao_id, kakao_link)')
+      .eq('month', month)
+      .order('slot', { ascending: true }),
   ]);
 
   if (branchesRes.error) {

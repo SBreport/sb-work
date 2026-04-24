@@ -114,10 +114,14 @@ export default function ClientsPage() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">해당하는 지점이 없습니다.</td></tr>
               ) : filtered.map((b, idx) => {
-                const a = b.assignments[0];
+                const assigns = b.assignments;
+                const a0 = assigns[0];
                 return (
                   <tr key={b.id} className={`border-b border-gray-50 ${idx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
-                    <td className="px-4 py-2 font-medium text-gray-900 whitespace-nowrap">{b.name}</td>
+                    <td className="px-4 py-2 font-medium text-gray-900 whitespace-nowrap">
+                      {b.name}
+                      {assigns.length > 1 && <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[10px] font-semibold">분할 {assigns.length}</span>}
+                    </td>
                     <td className="px-3 py-2">
                       <span className="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[11px]">{b.category}</span>
                     </td>
@@ -127,16 +131,30 @@ export default function ClientsPage() {
                       ) : <span className="text-gray-300">-</span>}
                     </td>
                     <td className="px-3 py-2 text-center text-xs text-gray-500">
-                      {a?.renewal_day ? `${a.renewal_day}일` : '-'}
+                      {a0?.renewal_day ? `${a0.renewal_day}일` : '-'}
                     </td>
                     <td className="px-3 py-2 text-center text-xs">
-                      {a?.main_writer_name ? (
-                        <span className="text-gray-700">{a.main_writer_name} <span className="font-bold text-blue-600">{a.main_quantity}</span></span>
+                      {assigns.filter(a => a.main_writer_name).length > 0 ? (
+                        <div className="space-y-0.5">
+                          {assigns.filter(a => a.main_writer_name).map((a, i) => (
+                            <div key={i} className="leading-tight">
+                              <span className="text-gray-700">{a.main_writer_name}</span>{' '}
+                              <span className="font-bold text-blue-600">{a.main_quantity}</span>
+                            </div>
+                          ))}
+                        </div>
                       ) : <span className="text-gray-300">-</span>}
                     </td>
                     <td className="px-3 py-2 text-center text-xs">
-                      {a?.sub_writer_name ? (
-                        <span className="text-gray-700">{a.sub_writer_name} <span className="font-bold text-green-600">{a.sub_quantity}</span></span>
+                      {assigns.filter(a => a.sub_writer_name).length > 0 ? (
+                        <div className="space-y-0.5">
+                          {assigns.filter(a => a.sub_writer_name).map((a, i) => (
+                            <div key={i} className="leading-tight">
+                              <span className="text-gray-700">{a.sub_writer_name}</span>{' '}
+                              <span className="font-bold text-green-600">{a.sub_quantity}</span>
+                            </div>
+                          ))}
+                        </div>
                       ) : <span className="text-gray-300">-</span>}
                     </td>
                   </tr>

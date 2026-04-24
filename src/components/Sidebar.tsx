@@ -50,6 +50,7 @@ const adminSubItems = [
   { href: '/admin/assignments', label: '블로그 업무 배정', icon: ClipboardList },
   { href: '/admin/writers', label: '계정 관리', icon: Users },
   { href: '/admin/branches', label: '지점 현황', icon: Building2 },
+  { href: '/admin/partners', label: '협력사 관리', icon: Handshake },
   { href: '/admin/import', label: '데이터 가져오기', icon: FileUp },
 ];
 

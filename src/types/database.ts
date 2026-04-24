@@ -2,6 +2,21 @@ export type UserRole = 'admin' | 'editor' | 'employee' | 'freelancer' | 'partner
 
 export type AssignmentStatus = 'active' | 'new' | 'changed' | 'terminated' | 'ai' | 'both';
 
+export type OperationType = 'unai' | 'direct' | 'solution' | 'agency';
+
+export type PartnerType = 'student' | 'agency';
+
+export interface Partner {
+  id: string;
+  name: string;
+  partner_type: PartnerType;
+  kakao_id?: string | null;
+  kakao_link?: string | null;
+  memo?: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
 export type ContractType = 'freelancer' | 'business';
 
 export interface User {
@@ -77,6 +92,10 @@ export interface Assignment {
   status: AssignmentStatus;
   note: string | null;
   product_type: string | null;
+  // 새 양식 (2026-04 개편)
+  operation_type?: OperationType | null;   // 구분: 유앤아이/직/솔루션/대행
+  partner_id?: string | null;               // 연결: partners FK
+  slot?: number;                             // 월별 다중 배정 구분 (기본 1)
   created_at: string;
   // joined
   branch?: Branch;
@@ -84,6 +103,7 @@ export interface Assignment {
   sub_writer?: User;
   optimal_writer?: User;
   inbl_writer?: User;
+  partner?: Partner;
 }
 
 export interface WriterSummary {

@@ -22,7 +22,18 @@ interface AssignmentSummary {
   renewal_day: number;
   status: string;
   note: string | null;
+  operation_type?: 'unai' | 'direct' | 'solution' | 'agency' | null;
+  partner_id?: string | null;
+  slot?: number;
+  partner?: { id: string; name: string; partner_type: 'student' | 'agency' } | null;
 }
+
+const OPERATION_LABELS: Record<string, string> = {
+  unai: '유앤아이',
+  direct: '직',
+  solution: '솔루션',
+  agency: '대행',
+};
 
 interface BranchWithAssignments extends Branch {
   assignments: AssignmentSummary[];
@@ -96,8 +107,6 @@ function BranchDetailModal({ branch, onClose, onSave, onDelete, isEditor }: {
     });
     setEditing(false);
   };
-
-  const a = branch.assignments[0]; // 현재 월 배정
 
   return (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -211,39 +220,62 @@ function BranchDetailModal({ branch, onClose, onSave, onDelete, isEditor }: {
             </>
           )}
 
-          {/* 현재 월 배정 현황 */}
+          {/* 현재 월 배정 현황 (다중 slot 지원) */}
           <div className="pt-2 border-t border-gray-100">
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">이번 달 배정 현황</h4>
-            {a ? (
-              <div className="bg-gray-50 rounded-lg p-3 space-y-1.5 text-sm">
-                {a.main_writer_name && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">사수</span>
-                    <span><span className="font-medium text-gray-900">{a.main_writer_name}</span> <span className="text-blue-600 font-bold">{a.main_quantity}건</span></span>
-                  </div>
-                )}
-                {a.sub_writer_name && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">부사수</span>
-                    <span><span className="font-medium text-gray-900">{a.sub_writer_name}</span> <span className="text-green-600 font-bold">{a.sub_quantity}건</span></span>
-                  </div>
-                )}
-                {a.optimal_writer_name && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">최적배포</span>
-                    <span><span className="font-medium text-gray-900">{a.optimal_writer_name}</span> <span className="text-indigo-600 font-bold">{a.optimal_quantity}건</span></span>
-                  </div>
-                )}
-                {a.inbl_writer_name && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">인블</span>
-                    <span><span className="font-medium text-gray-900">{a.inbl_writer_name}</span> <span className="text-amber-600 font-bold">{a.inbl_quantity}건</span></span>
-                  </div>
-                )}
-                {a.note && <p className="text-xs text-gray-400 pt-1 border-t border-gray-200">{a.note}</p>}
-              </div>
-            ) : (
+            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              이번 달 배정 현황 {branch.assignments.length > 1 && `(${branch.assignments.length}개 분할)`}
+            </h4>
+            {branch.assignments.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-3">이번 달 배정 내역 없음</p>
+            ) : (
+              <div className="space-y-2">
+                {branch.assignments.map((assign, idx) => (
+                  <div key={assign.id} className="bg-gray-50 rounded-lg p-3 space-y-1.5 text-sm">
+                    {branch.assignments.length > 1 && (
+                      <div className="flex items-center gap-2 pb-1.5 border-b border-gray-200 text-[11px] font-bold text-gray-500">
+                        분할 {assign.slot ?? idx + 1}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-1.5">
+                      {assign.operation_type && (
+                        <span className="px-1.5 py-0.5 rounded text-[11px] bg-orange-100 text-orange-700 font-medium">
+                          {OPERATION_LABELS[assign.operation_type] || assign.operation_type}
+                        </span>
+                      )}
+                      {assign.partner && (
+                        <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${assign.partner.partner_type === 'student' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {assign.partner.partner_type === 'student' ? '수강생' : '대행사'} · {assign.partner.name}
+                        </span>
+                      )}
+                    </div>
+                    {assign.main_writer_name && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">사수</span>
+                        <span><span className="font-medium text-gray-900">{assign.main_writer_name}</span> <span className="text-blue-600 font-bold">{assign.main_quantity}건</span></span>
+                      </div>
+                    )}
+                    {assign.sub_writer_name && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">부사수</span>
+                        <span><span className="font-medium text-gray-900">{assign.sub_writer_name}</span> <span className="text-green-600 font-bold">{assign.sub_quantity}건</span></span>
+                      </div>
+                    )}
+                    {assign.optimal_writer_name && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">최적배포</span>
+                        <span><span className="font-medium text-gray-900">{assign.optimal_writer_name}</span> <span className="text-indigo-600 font-bold">{assign.optimal_quantity}건</span></span>
+                      </div>
+                    )}
+                    {assign.inbl_writer_name && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">인블</span>
+                        <span><span className="font-medium text-gray-900">{assign.inbl_writer_name}</span> <span className="text-amber-600 font-bold">{assign.inbl_quantity}건</span></span>
+                      </div>
+                    )}
+                    {assign.note && <p className="text-xs text-gray-400 pt-1 border-t border-gray-200">{assign.note}</p>}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
@@ -458,14 +490,32 @@ export default function BranchesPage() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={8} className="px-6 py-8 text-center text-gray-400">해당하는 지점이 없습니다.</td></tr>
               ) : filtered.map((b, idx) => {
-                const a = b.assignments[0];
+                const assigns = b.assignments;
+                const renderMultiCell = (getValue: (a: AssignmentSummary) => { name: string | null; qty: number }, colorClass: string) => {
+                  const parts = assigns.map(a => getValue(a)).filter(v => v.name);
+                  if (parts.length === 0) return <span className="text-gray-300">-</span>;
+                  return (
+                    <div className="space-y-0.5">
+                      {parts.map((v, i) => (
+                        <div key={i} className="leading-tight">
+                          <span className="text-gray-700">{v.name}</span>
+                          {' '}
+                          <span className={`font-bold ${colorClass}`}>{v.qty}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                };
                 return (
                   <tr
                     key={b.id}
                     onClick={() => setSelectedBranch(b)}
                     className={`border-b border-gray-50 hover:bg-blue-50/30 cursor-pointer ${idx % 2 === 1 ? 'bg-gray-50/30' : ''}`}
                   >
-                    <td className="px-4 py-2 font-medium text-gray-900 whitespace-nowrap">{b.name}</td>
+                    <td className="px-4 py-2 font-medium text-gray-900 whitespace-nowrap">
+                      {b.name}
+                      {assigns.length > 1 && <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[10px] font-semibold">분할 {assigns.length}</span>}
+                    </td>
                     <td className="px-3 py-2">
                       <span className="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[11px]">{b.category}</span>
                     </td>
@@ -480,24 +530,16 @@ export default function BranchesPage() {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-center text-xs">
-                      {a?.main_writer_name ? (
-                        <div><span className="text-gray-700">{a.main_writer_name}</span><br /><span className="font-bold text-blue-600">{a.main_quantity}</span></div>
-                      ) : <span className="text-gray-300">-</span>}
+                      {renderMultiCell(a => ({ name: a.main_writer_name, qty: a.main_quantity }), 'text-blue-600')}
                     </td>
                     <td className="px-3 py-2 text-center text-xs">
-                      {a?.sub_writer_name ? (
-                        <div><span className="text-gray-700">{a.sub_writer_name}</span><br /><span className="font-bold text-green-600">{a.sub_quantity}</span></div>
-                      ) : <span className="text-gray-300">-</span>}
+                      {renderMultiCell(a => ({ name: a.sub_writer_name, qty: a.sub_quantity }), 'text-green-600')}
                     </td>
                     <td className="px-3 py-2 text-center text-xs">
-                      {a?.optimal_writer_name ? (
-                        <div><span className="text-gray-700">{a.optimal_writer_name}</span><br /><span className="font-bold text-indigo-600">{a.optimal_quantity}</span></div>
-                      ) : <span className="text-gray-300">-</span>}
+                      {renderMultiCell(a => ({ name: a.optimal_writer_name, qty: a.optimal_quantity }), 'text-indigo-600')}
                     </td>
                     <td className="px-3 py-2 text-center text-xs">
-                      {a?.inbl_writer_name ? (
-                        <div><span className="text-gray-700">{a.inbl_writer_name}</span><br /><span className="font-bold text-amber-600">{a.inbl_quantity}</span></div>
-                      ) : <span className="text-gray-300">-</span>}
+                      {renderMultiCell(a => ({ name: a.inbl_writer_name, qty: a.inbl_quantity }), 'text-amber-600')}
                     </td>
                   </tr>
                 );

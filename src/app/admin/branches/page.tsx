@@ -5,6 +5,9 @@ import { authFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
 import type { Branch } from '@/types/database';
 import { Plus, Trash2, X, ChevronLeft, ChevronRight, Search, Edit3 } from 'lucide-react';
+import { SortableHeader, useSort, sortRows } from '@/components/SortableHeader';
+
+type BranchSortKey = 'name' | 'category' | 'product_type' | 'status' | 'main' | 'sub' | 'optimal' | 'inbl';
 
 const CATEGORIES = ['피부과', '내과', '산부인과', '한의원', '성형외과', '정형외과', '치과', '안과', '세무법인', '기타'];
 const PRODUCT_TYPES = ['유앤아이', '로컬', '솔루션', '대행'];
@@ -378,6 +381,7 @@ export default function BranchesPage() {
   const [search, setSearch] = useState('');
   const [selectedBranch, setSelectedBranch] = useState<BranchWithAssignments | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const { sort, onSort } = useSort<BranchSortKey>();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -476,20 +480,35 @@ export default function BranchesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-4 py-2.5 text-left font-medium text-gray-600 text-xs">지점명</th>
-                <th className="px-3 py-2.5 text-left font-medium text-gray-600 text-xs w-16">과목</th>
-                <th className="px-3 py-2.5 text-left font-medium text-gray-600 text-xs w-16">유형</th>
-                <th className="px-3 py-2.5 text-center font-medium text-gray-600 text-xs w-12">상태</th>
-                <th className="px-3 py-2.5 text-center font-medium text-blue-600 text-xs w-20">사수</th>
-                <th className="px-3 py-2.5 text-center font-medium text-green-600 text-xs w-20">부사수</th>
-                <th className="px-3 py-2.5 text-center font-medium text-indigo-600 text-xs w-20">최적배포</th>
-                <th className="px-3 py-2.5 text-center font-medium text-amber-600 text-xs w-20">인블</th>
+                <SortableHeader<BranchSortKey> label="지점명" sortKey="name" sort={sort} onSort={onSort} className="pl-4 w-auto" />
+                <SortableHeader<BranchSortKey> label="과목" sortKey="category" sort={sort} onSort={onSort} className="w-16" />
+                <SortableHeader<BranchSortKey> label="유형" sortKey="product_type" sort={sort} onSort={onSort} className="w-16" />
+                <SortableHeader<BranchSortKey> label="상태" sortKey="status" sort={sort} onSort={onSort} align="center" className="w-12" />
+                <SortableHeader<BranchSortKey> label="사수" sortKey="main" sort={sort} onSort={onSort} align="center" className="w-20" />
+                <SortableHeader<BranchSortKey> label="부사수" sortKey="sub" sort={sort} onSort={onSort} align="center" className="w-20" />
+                <SortableHeader<BranchSortKey> label="최적배포" sortKey="optimal" sort={sort} onSort={onSort} align="center" className="w-20" />
+                <SortableHeader<BranchSortKey> label="인블" sortKey="inbl" sort={sort} onSort={onSort} align="center" className="w-20" />
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
-                <tr><td colSpan={8} className="px-6 py-8 text-center text-gray-400">해당하는 지점이 없습니다.</td></tr>
-              ) : filtered.map((b, idx) => {
+              {(() => {
+                const sortedBranches = sortRows(filtered, sort, (b, k) => {
+                  if (k === 'name' || k === 'category' || k === 'product_type' || k === 'status') {
+                    return (b[k] ?? '') as string;
+                  }
+                  // 배정 수량 합계로 정렬
+                  const sum = (field: keyof AssignmentSummary) =>
+                    b.assignments.reduce((acc, a) => acc + (Number(a[field]) || 0), 0);
+                  if (k === 'main') return sum('main_quantity');
+                  if (k === 'sub') return sum('sub_quantity');
+                  if (k === 'optimal') return sum('optimal_quantity');
+                  if (k === 'inbl') return sum('inbl_quantity');
+                  return 0;
+                });
+                if (sortedBranches.length === 0) {
+                  return <tr><td colSpan={8} className="px-6 py-8 text-center text-gray-400">해당하는 지점이 없습니다.</td></tr>;
+                }
+                return sortedBranches.map((b, idx) => {
                 const assigns = b.assignments;
                 const renderMultiCell = (getValue: (a: AssignmentSummary) => { name: string | null; qty: number }, colorClass: string) => {
                   const parts = assigns.map(a => getValue(a)).filter(v => v.name);
@@ -543,7 +562,8 @@ export default function BranchesPage() {
                     </td>
                   </tr>
                 );
-              })}
+              });
+              })()}
             </tbody>
           </table>
         </div>

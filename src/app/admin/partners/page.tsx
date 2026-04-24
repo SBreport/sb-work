@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { authFetch } from '@/lib/api-client';
 import type { Partner, PartnerType } from '@/types/database';
 import { Plus, Trash2, X, Edit3, Search } from 'lucide-react';
+import { SortableHeader, useSort, sortRows } from '@/components/SortableHeader';
+
+type PartnerSortKey = 'name' | 'partner_type' | 'kakao_id' | 'kakao_link' | 'is_active';
 
 function PartnerModal({ partner, onClose, onSave, onDelete }: {
   partner: Partner | null;
@@ -80,6 +83,7 @@ export default function PartnersPage() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Partner | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const { sort, onSort } = useSort<PartnerSortKey>();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -158,18 +162,24 @@ export default function PartnersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-4 py-2.5 text-left font-medium text-gray-600 text-xs">이름</th>
-                <th className="px-3 py-2.5 text-left font-medium text-gray-600 text-xs w-20">분류</th>
-                <th className="px-3 py-2.5 text-left font-medium text-gray-600 text-xs">카카오톡 ID</th>
-                <th className="px-3 py-2.5 text-left font-medium text-gray-600 text-xs">단톡방</th>
-                <th className="px-3 py-2.5 text-center font-medium text-gray-600 text-xs w-16">상태</th>
+                <SortableHeader<PartnerSortKey> label="이름" sortKey="name" sort={sort} onSort={onSort} className="pl-4" />
+                <SortableHeader<PartnerSortKey> label="분류" sortKey="partner_type" sort={sort} onSort={onSort} className="w-20" />
+                <SortableHeader<PartnerSortKey> label="카카오톡 ID" sortKey="kakao_id" sort={sort} onSort={onSort} />
+                <SortableHeader<PartnerSortKey> label="단톡방" sortKey="kakao_link" sort={sort} onSort={onSort} />
+                <SortableHeader<PartnerSortKey> label="상태" sortKey="is_active" sort={sort} onSort={onSort} align="center" className="w-16" />
                 <th className="px-3 py-2.5 text-center font-medium text-gray-600 text-xs w-16">편집</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">해당하는 협력사가 없습니다.</td></tr>
-              ) : filtered.map((p, idx) => (
+              {(() => {
+                const sortedPartners = sortRows(filtered, sort, (p, k) => {
+                  if (k === 'is_active') return p.is_active ? 1 : 0;
+                  return (p[k as 'name' | 'partner_type' | 'kakao_id' | 'kakao_link'] ?? '') as string;
+                });
+                if (sortedPartners.length === 0) {
+                  return <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">해당하는 협력사가 없습니다.</td></tr>;
+                }
+                return sortedPartners.map((p, idx) => (
                 <tr key={p.id} className={`border-b border-gray-50 hover:bg-blue-50/30 ${idx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
                   <td className="px-4 py-2 font-medium text-gray-900">{p.name}</td>
                   <td className="px-3 py-2">
@@ -192,7 +202,8 @@ export default function PartnersPage() {
                     <button onClick={() => setSelected(p)} className="p-1.5 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50"><Edit3 size={14} /></button>
                   </td>
                 </tr>
-              ))}
+                ));
+              })()}
             </tbody>
           </table>
         </div>

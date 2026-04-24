@@ -189,6 +189,17 @@ function TeamCard({ team, onMemberClick, defaultOpen = true, myId }: { team: Tea
             </div>
           )}
 
+          {others.length > 0 && (
+            <div className="mb-1">
+              {(leader || mentors.length > 0 || mentees.length > 0) && (
+                <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold text-gray-400 tracking-wider">팀원 {others.length}</div>
+              )}
+              <div className="grid grid-cols-2 gap-x-0">
+                {others.map(m => <PersonRow key={m.id} member={m} onClick={() => onMemberClick(m)} isMe={m.id === myId} />)}
+              </div>
+            </div>
+          )}
+
           {mentors.length > 0 && (
             <div className="mb-1">
               <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold text-emerald-600 tracking-wider">사수 {mentors.length}</div>
@@ -199,21 +210,10 @@ function TeamCard({ team, onMemberClick, defaultOpen = true, myId }: { team: Tea
           )}
 
           {mentees.length > 0 && (
-            <div className="mb-1">
+            <div>
               <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold text-amber-600 tracking-wider">부사수 {mentees.length}</div>
               <div className="grid grid-cols-2 gap-x-0">
                 {mentees.map(m => <PersonRow key={m.id} member={m} onClick={() => onMemberClick(m)} isMe={m.id === myId} />)}
-              </div>
-            </div>
-          )}
-
-          {others.length > 0 && (
-            <div>
-              {(leader || mentors.length > 0 || mentees.length > 0) && (
-                <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold text-gray-400 tracking-wider">팀원 {others.length}</div>
-              )}
-              <div className="grid grid-cols-2 gap-x-0">
-                {others.map(m => <PersonRow key={m.id} member={m} onClick={() => onMemberClick(m)} isMe={m.id === myId} />)}
               </div>
             </div>
           )}

@@ -7,6 +7,9 @@ import { useAuth } from '@/lib/auth-context';
 import type { User } from '@/types/database';
 import { Plus, Pencil, RefreshCw } from 'lucide-react';
 import WriterEditModal from './WriterEditModal';
+import { SortableHeader, useSort, sortRows } from '@/components/SortableHeader';
+
+type WriterSortKey = 'name' | 'email' | 'phone' | 'role' | 'is_active';
 
 export default function WritersPage() {
   const { isEditor } = useAuth();
@@ -16,6 +19,7 @@ export default function WritersPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [newWriter, setNewWriter] = useState({ name: '', email: '', phone: '', password: '', role: 'freelancer' as 'employee' | 'freelancer' });
   const [filter, setFilter] = useState<'all' | 'employee' | 'freelancer'>('all');
+  const { sort, onSort } = useSort<WriterSortKey>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [rematching, setRematching] = useState(false);
@@ -211,21 +215,24 @@ export default function WritersPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-6 py-3 text-left font-medium text-gray-600">이름</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-600">이메일</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-600">전화번호</th>
-              <th className="px-6 py-3 text-center font-medium text-gray-600">소속</th>
-              <th className="px-6 py-3 text-center font-medium text-gray-600">상태</th>
-              <th className="px-6 py-3 text-center font-medium text-gray-600">관리</th>
+              <SortableHeader<WriterSortKey> label="이름" sortKey="name" sort={sort} onSort={onSort} className="pl-6" />
+              <SortableHeader<WriterSortKey> label="이메일" sortKey="email" sort={sort} onSort={onSort} />
+              <SortableHeader<WriterSortKey> label="전화번호" sortKey="phone" sort={sort} onSort={onSort} />
+              <SortableHeader<WriterSortKey> label="소속" sortKey="role" sort={sort} onSort={onSort} align="center" />
+              <SortableHeader<WriterSortKey> label="상태" sortKey="is_active" sort={sort} onSort={onSort} align="center" />
+              <th className="px-6 py-3 text-center font-medium text-gray-600 text-xs">관리</th>
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">로딩 중...</td></tr>
-            ) : writers.filter(w => filter === 'all' ? true : w.role === filter).length === 0 ? (
-              <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">등록된 담당자가 없습니다.</td></tr>
-            ) : (
-              writers.filter(w => filter === 'all' ? true : w.role === filter).map((w) => (
+            {(() => {
+              const filtered = writers.filter(w => filter === 'all' ? true : w.role === filter);
+              const sorted = sortRows(filtered, sort, (w, k) => {
+                if (k === 'is_active') return w.is_active ? 1 : 0;
+                return (w[k as 'name' | 'email' | 'phone' | 'role'] ?? '') as string;
+              });
+              if (loading) return <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">로딩 중...</td></tr>;
+              if (sorted.length === 0) return <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">등록된 담당자가 없습니다.</td></tr>;
+              return sorted.map((w) => (
                 <tr key={w.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="px-6 py-3 font-medium">{w.name}</td>
                   <td className="px-6 py-3 text-gray-500">{w.email}</td>
@@ -260,8 +267,8 @@ export default function WritersPage() {
                     )}
                   </td>
                 </tr>
-              ))
-            )}
+              ));
+            })()}
           </tbody>
         </table>
       </div>

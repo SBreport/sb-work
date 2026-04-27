@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { authFetch } from '@/lib/api-client';
+import { useAuth } from '@/lib/auth-context';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
 interface BranchItem {
@@ -21,6 +22,10 @@ interface BranchItem {
 }
 
 export default function ClientsPage() {
+  const { profile } = useAuth();
+  // 정보 노출 권한: 관리자/편집자/직원만 담당자·수량 열람 가능. 프리랜서는 지점명/과목/유형만.
+  const canSeeAssignments = profile?.role === 'admin' || profile?.role === 'editor' || profile?.role === 'employee';
+
   const now = new Date();
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
   const [branches, setBranches] = useState<BranchItem[]>([]);
@@ -64,7 +69,10 @@ export default function ClientsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">클라이언트</h2>
-          <p className="text-xs text-gray-500 mt-0.5">활성 지점 {branches.length}개</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            활성 지점 {branches.length}개
+            {!canSeeAssignments && <span className="ml-2 text-gray-400">· 담당자 정보는 비공개입니다</span>}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-gray-100"><ChevronLeft size={18} /></button>
@@ -105,14 +113,18 @@ export default function ClientsPage() {
                 <th className="px-4 py-2.5 text-left font-medium text-gray-600 text-xs">지점명</th>
                 <th className="px-3 py-2.5 text-left font-medium text-gray-600 text-xs">과목</th>
                 <th className="px-3 py-2.5 text-left font-medium text-gray-600 text-xs">유형</th>
-                <th className="px-3 py-2.5 text-center font-medium text-gray-600 text-xs">갱신일</th>
-                <th className="px-3 py-2.5 text-center font-medium text-blue-600 text-xs">사수</th>
-                <th className="px-3 py-2.5 text-center font-medium text-green-600 text-xs">부사수</th>
+                {canSeeAssignments && (
+                  <>
+                    <th className="px-3 py-2.5 text-center font-medium text-gray-600 text-xs">갱신일</th>
+                    <th className="px-3 py-2.5 text-center font-medium text-blue-600 text-xs">사수</th>
+                    <th className="px-3 py-2.5 text-center font-medium text-green-600 text-xs">부사수</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">해당하는 지점이 없습니다.</td></tr>
+                <tr><td colSpan={canSeeAssignments ? 6 : 3} className="px-6 py-8 text-center text-gray-400">해당하는 지점이 없습니다.</td></tr>
               ) : filtered.map((b, idx) => {
                 const assigns = b.assignments;
                 const a0 = assigns[0];
@@ -120,7 +132,7 @@ export default function ClientsPage() {
                   <tr key={b.id} className={`border-b border-gray-50 ${idx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
                     <td className="px-4 py-2 font-medium text-gray-900 whitespace-nowrap">
                       {b.name}
-                      {assigns.length > 1 && <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[10px] font-semibold">분할 {assigns.length}</span>}
+                      {canSeeAssignments && assigns.length > 1 && <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[10px] font-semibold">분할 {assigns.length}</span>}
                     </td>
                     <td className="px-3 py-2">
                       <span className="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[11px]">{b.category}</span>
@@ -130,33 +142,37 @@ export default function ClientsPage() {
                         <span className="inline-block px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[11px]">{b.product_type}</span>
                       ) : <span className="text-gray-300">-</span>}
                     </td>
-                    <td className="px-3 py-2 text-center text-xs text-gray-500">
-                      {a0?.renewal_day ? `${a0.renewal_day}일` : '-'}
-                    </td>
-                    <td className="px-3 py-2 text-center text-xs">
-                      {assigns.filter(a => a.main_writer_name).length > 0 ? (
-                        <div className="space-y-0.5">
-                          {assigns.filter(a => a.main_writer_name).map((a, i) => (
-                            <div key={i} className="leading-tight">
-                              <span className="text-gray-700">{a.main_writer_name}</span>{' '}
-                              <span className="font-bold text-blue-600">{a.main_quantity}</span>
+                    {canSeeAssignments && (
+                      <>
+                        <td className="px-3 py-2 text-center text-xs text-gray-500">
+                          {a0?.renewal_day ? `${a0.renewal_day}일` : '-'}
+                        </td>
+                        <td className="px-3 py-2 text-center text-xs">
+                          {assigns.filter(a => a.main_writer_name).length > 0 ? (
+                            <div className="space-y-0.5">
+                              {assigns.filter(a => a.main_writer_name).map((a, i) => (
+                                <div key={i} className="leading-tight">
+                                  <span className="text-gray-700">{a.main_writer_name}</span>{' '}
+                                  <span className="font-bold text-blue-600">{a.main_quantity}</span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      ) : <span className="text-gray-300">-</span>}
-                    </td>
-                    <td className="px-3 py-2 text-center text-xs">
-                      {assigns.filter(a => a.sub_writer_name).length > 0 ? (
-                        <div className="space-y-0.5">
-                          {assigns.filter(a => a.sub_writer_name).map((a, i) => (
-                            <div key={i} className="leading-tight">
-                              <span className="text-gray-700">{a.sub_writer_name}</span>{' '}
-                              <span className="font-bold text-green-600">{a.sub_quantity}</span>
+                          ) : <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className="px-3 py-2 text-center text-xs">
+                          {assigns.filter(a => a.sub_writer_name).length > 0 ? (
+                            <div className="space-y-0.5">
+                              {assigns.filter(a => a.sub_writer_name).map((a, i) => (
+                                <div key={i} className="leading-tight">
+                                  <span className="text-gray-700">{a.sub_writer_name}</span>{' '}
+                                  <span className="font-bold text-green-600">{a.sub_quantity}</span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      ) : <span className="text-gray-300">-</span>}
-                    </td>
+                          ) : <span className="text-gray-300">-</span>}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 );
               })}

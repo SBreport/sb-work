@@ -5,6 +5,10 @@ import { createServerSupabase } from '@/lib/supabase-server';
 /**
  * GET /api/branches — 지점 목록 + 해당 월 배정 현황
  * ?month=2026-04 (optional, defaults to current month)
+ *
+ * 권한:
+ * - admin/editor/employee: 전체 데이터 (assignments 포함)
+ * - freelancer/partner: 지점 기본 정보만 (assignments 빈 배열)
  */
 export async function GET(request: NextRequest) {
   const auth = await requireAuth(request);
@@ -16,25 +20,34 @@ export async function GET(request: NextRequest) {
 
   const supabase = createServerSupabase();
 
-  const [branchesRes, assignmentsRes] = await Promise.all([
-    supabase
-      .from('branches')
-      .select('*')
-      .order('name'),
-    supabase
-      .from('assignments')
-      .select('id, branch_id, main_writer_name, main_quantity, sub_writer_name, sub_quantity, optimal_writer_name, optimal_quantity, inbl_writer_name, inbl_quantity, renewal_day, status, note, product_type, operation_type, partner_id, slot, partner:partners(id, name, partner_type, kakao_id, kakao_link)')
-      .eq('month', month)
-      .order('slot', { ascending: true }),
-  ]);
+  // 사용자 role 확인 (assignments 노출 여부 결정)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', auth.userId)
+    .single();
+  const canSeeAssignments = profile?.role === 'admin' || profile?.role === 'editor' || profile?.role === 'employee';
+
+  // assignments는 권한 있는 사용자에게만 조회
+  const branchesPromise = supabase.from('branches').select('*').order('name');
+  const assignmentsPromise = canSeeAssignments
+    ? supabase
+        .from('assignments')
+        .select('id, branch_id, main_writer_name, main_quantity, sub_writer_name, sub_quantity, optimal_writer_name, optimal_quantity, inbl_writer_name, inbl_quantity, renewal_day, status, note, product_type, operation_type, partner_id, slot, partner:partners(id, name, partner_type, kakao_id, kakao_link)')
+        .eq('month', month)
+        .order('slot', { ascending: true })
+    : Promise.resolve({ data: [], error: null });
+
+  const [branchesRes, assignmentsRes] = await Promise.all([branchesPromise, assignmentsPromise]);
 
   if (branchesRes.error) {
     return NextResponse.json({ error: branchesRes.error.message }, { status: 500 });
   }
 
   // 배정 데이터를 branch_id로 맵핑
-  const assignmentMap = new Map<string, typeof assignmentsRes.data>();
-  for (const a of assignmentsRes.data || []) {
+  const assignmentList = (assignmentsRes.data ?? []) as Array<Record<string, unknown> & { branch_id: string }>;
+  const assignmentMap = new Map<string, typeof assignmentList>();
+  for (const a of assignmentList) {
     const list = assignmentMap.get(a.branch_id) || [];
     list.push(a);
     assignmentMap.set(a.branch_id, list);

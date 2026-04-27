@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { authFetch } from '@/lib/api-client';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -35,6 +35,9 @@ export default function AssignmentsPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
+  // 셀 편집 대기 상태 — assignmentId별로 변경된 필드만 누적
+  const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<Assignment>>>({});
+  const [saving, setSaving] = useState(false);
 
   const fetchAssignments = useCallback(async () => {
     setLoading(true);
@@ -59,6 +62,7 @@ export default function AssignmentsPage() {
       .from('profiles')
       .select('id, name')
       .eq('is_active', true)
+      .neq('role', 'admin')
       .order('name');
     setWriters(data || []);
   }, []);
@@ -68,40 +72,85 @@ export default function AssignmentsPage() {
     fetchWriters();
   }, [fetchAssignments, fetchWriters]);
 
-  // 인라인 필드 업데이트 (로깅 포함)
-  const updateField = async (id: string, field: string, value: unknown) => {
-    await authFetch('/api/assignments/update', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        assignment_id: id,
-        updates: { [field]: value },
-        changed_by: user?.id,
-      }),
-    });
-    setAssignments(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
+  // 월 변경 시 pending 초기화
+  useEffect(() => {
+    setPendingChanges({});
+  }, [month]);
+
+  // 페이지 떠나기 경고
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (Object.keys(pendingChanges).length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [pendingChanges]);
+
+  // 표시 데이터 = 원본 + pendingChanges 머지
+  const displayAssignments = useMemo(
+    () => assignments.map(a => ({ ...a, ...(pendingChanges[a.id] || {}) })),
+    [assignments, pendingChanges]
+  );
+
+  // 인라인 필드 업데이트 — API 호출 없이 pending에만 누적
+  const updateField = (id: string, field: string, value: unknown) => {
+    setPendingChanges(prev => ({
+      ...prev,
+      [id]: { ...(prev[id] || {}), [field]: value as Assignment[keyof Assignment] },
+    }));
   };
 
-  // 담당자 변경 (로깅 포함)
-  const updateWriter = async (id: string, role: string, writerId: string) => {
+  // 담당자 변경 — API 호출 없이 pending에만 누적 (여러 필드 한번에 머지)
+  const updateWriter = (id: string, role: string, writerId: string) => {
     const writer = writers.find(w => w.id === writerId);
-    const updates: Record<string, unknown> = {
-      [`${role}_writer_id`]: writerId || null,
-      [`${role}_writer_name`]: writer?.name || null,
+    const patch: Partial<Assignment> = {
+      [`${role}_writer_id`]: (writerId || null) as unknown as Assignment[keyof Assignment],
+      [`${role}_writer_name`]: (writer?.name || null) as unknown as Assignment[keyof Assignment],
+      [`${role}_writer`]: (writer || null) as unknown as Assignment[keyof Assignment],
     };
-    await authFetch('/api/assignments/update', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        assignment_id: id,
-        updates,
-        changed_by: user?.id,
-      }),
-    });
-    setAssignments(prev => prev.map(a => {
-      if (a.id !== id) return a;
-      return { ...a, ...updates, [`${role}_writer`]: writer || null };
+    setPendingChanges(prev => ({
+      ...prev,
+      [id]: { ...(prev[id] || {}), ...patch },
     }));
+  };
+
+  // 일괄 저장 — pending 항목들을 병렬 PATCH
+  const handleSave = async () => {
+    setSaving(true);
+    const entries = Object.entries(pendingChanges);
+    try {
+      await Promise.all(
+        entries.map(([id, fields]) => {
+          // writer 객체 필드는 API에 보내지 않음 (DB 컬럼 아님)
+          const { main_writer, sub_writer, optimal_writer, inbl_writer, ...dbFields } = fields as Record<string, unknown>;
+          void main_writer; void sub_writer; void optimal_writer; void inbl_writer;
+          if (Object.keys(dbFields).length === 0) return Promise.resolve();
+          return authFetch('/api/assignments/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              assignment_id: id,
+              updates: dbFields,
+              changed_by: user?.id,
+            }),
+          });
+        })
+      );
+      setPendingChanges({});
+      await fetchAssignments();
+    } catch {
+      alert('저장 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (Object.keys(pendingChanges).length > 0 && !confirm('변경사항을 취소하시겠습니까?')) return;
+    setPendingChanges({});
   };
 
   // 이력 조회
@@ -183,8 +232,8 @@ export default function AssignmentsPage() {
   // 담당자 드롭다운 옵션
   const writerOptions = writers.map(w => ({ value: w.id, label: w.name }));
 
-  // 담당자별 수량 집계
-  const writerSummary = calcWriterStats(assignments);
+  // 담당자별 수량 집계 — pending 변경사항 반영된 displayAssignments 기준
+  const writerSummary = useMemo(() => calcWriterStats(displayAssignments), [displayAssignments]);
 
   const getWriterDisplay = (writer: unknown, name: string | null | undefined, role: string) => {
     const writerName = (writer as { name?: string; id?: string } | null)?.name || name;
@@ -200,6 +249,30 @@ export default function AssignmentsPage() {
 
   return (
     <div className="p-4 max-w-full">
+      {/* 변경사항 대기 바 */}
+      {Object.keys(pendingChanges).length > 0 && (
+        <div className="sticky top-0 z-20 bg-amber-50 border-b border-amber-300 px-4 py-2.5 flex items-center justify-between gap-3 shadow-sm -mx-4 mb-4">
+          <span className="text-sm text-amber-800">
+            <strong>{Object.keys(pendingChanges).length}건</strong>의 변경사항이 저장 대기 중입니다.
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={handleCancel}
+              className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              취소
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? '저장 중...' : '저장'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-bold text-gray-900">배정 관리</h2>
@@ -236,6 +309,31 @@ export default function AssignmentsPage() {
       {/* 인라인 편집 안내 */}
       {!isEditor && <p className="text-xs text-gray-400 mb-2">셀을 클릭하면 바로 수정할 수 있습니다.</p>}
 
+      {/* 담당자별 수량 집계 — 테이블 위 */}
+      {Object.keys(writerSummary).length > 0 && (
+        <div className="mb-4 bg-white rounded-lg border border-gray-200 p-4">
+          <h3 className="text-xs font-semibold text-gray-700 mb-3">담당자별 수량 집계</h3>
+          <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-2">
+            {Object.entries(writerSummary)
+              .sort((a, b) => totalQty(b[1]) - totalQty(a[1]))
+              .map(([id, s]) => (
+                <div key={id} className="bg-gray-50 rounded-lg p-2.5">
+                  <p className="font-medium text-gray-900 text-xs">{s.name}</p>
+                  <div className="flex flex-wrap gap-1 mt-1 text-xs">
+                    {s.mainQty > 0 && <span className="text-blue-600">사{s.mainQty}</span>}
+                    {s.subQty > 0 && <span className="text-green-600">부{s.subQty}</span>}
+                    {s.optimalQty > 0 && <span className="text-purple-600">최{s.optimalQty}</span>}
+                    {s.inblQty > 0 && <span className="text-amber-600">인{s.inblQty}</span>}
+                  </div>
+                  <p className="text-xs font-semibold text-gray-600 mt-0.5">
+                    합 {totalQty(s)}
+                  </p>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* 배정 테이블 */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
@@ -261,10 +359,10 @@ export default function AssignmentsPage() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={14} className="px-4 py-8 text-center text-gray-400">로딩 중...</td></tr>
-              ) : assignments.length === 0 ? (
+              ) : displayAssignments.length === 0 ? (
                 <tr><td colSpan={14} className="px-4 py-8 text-center text-gray-400">배정 데이터가 없습니다.</td></tr>
               ) : (
-                assignments.map((a) => {
+                displayAssignments.map((a) => {
                   const main = getWriterDisplay(a.main_writer, a.main_writer_name, 'main');
                   const sub = getWriterDisplay(a.sub_writer, a.sub_writer_name, 'sub');
                   const opt = getWriterDisplay(a.optimal_writer, a.optimal_writer_name, 'optimal');
@@ -392,31 +490,6 @@ export default function AssignmentsPage() {
           </table>
         </div>
       </div>
-
-      {/* 담당자별 수량 집계 */}
-      {Object.keys(writerSummary).length > 0 && (
-        <div className="mt-4 bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="text-xs font-semibold text-gray-700 mb-3">담당자별 수량 집계</h3>
-          <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-2">
-            {Object.entries(writerSummary)
-              .sort((a, b) => totalQty(b[1]) - totalQty(a[1]))
-              .map(([id, s]) => (
-                <div key={id} className="bg-gray-50 rounded-lg p-2.5">
-                  <p className="font-medium text-gray-900 text-xs">{s.name}</p>
-                  <div className="flex flex-wrap gap-1 mt-1 text-xs">
-                    {s.mainQty > 0 && <span className="text-blue-600">사{s.mainQty}</span>}
-                    {s.subQty > 0 && <span className="text-green-600">부{s.subQty}</span>}
-                    {s.optimalQty > 0 && <span className="text-purple-600">최{s.optimalQty}</span>}
-                    {s.inblQty > 0 && <span className="text-amber-600">인{s.inblQty}</span>}
-                  </div>
-                  <p className="text-xs font-semibold text-gray-600 mt-0.5">
-                    합 {totalQty(s)}
-                  </p>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
 
       {/* 변경 이력 */}
       <div className="mt-4">

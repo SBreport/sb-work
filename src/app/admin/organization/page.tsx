@@ -34,7 +34,7 @@ interface OrgData {
 }
 
 const POSITIONS = ['대표', '이사', '총괄팀장', '팀장', '팀원'];
-const MENTOR_ROLES = ['', '사수', '부사수'];
+const MENTOR_ROLES = [null, '사수', '부사수'] as const;
 
 function TeamManager({
   team,
@@ -153,7 +153,7 @@ function TeamManager({
               >
                 <option value="">없음</option>
                 {allMembers
-                  .filter(m => m.employee_type === 'internal')
+                  .filter(m => ['admin', 'editor', 'employee'].includes(m.role))
                   .map(m => (
                     <option key={m.id} value={m.id}>{m.name}</option>
                   ))}
@@ -197,12 +197,12 @@ function TeamManager({
 
                     {/* 멘토 역할 */}
                     <select
-                      value={member.mentor_role || ''}
-                      onChange={e => updateMember(member.id, { mentor_role: e.target.value || null })}
+                      value={member.mentor_role ?? ''}
+                      onChange={e => updateMember(member.id, { mentor_role: e.target.value === '' ? null : e.target.value })}
                       className="border border-gray-200 rounded px-1.5 py-1 text-xs w-16"
                     >
                       {MENTOR_ROLES.map(r => (
-                        <option key={r} value={r}>{r || '없음'}</option>
+                        <option key={r ?? 'none'} value={r ?? ''}>{r ?? '없음'}</option>
                       ))}
                     </select>
                   </>

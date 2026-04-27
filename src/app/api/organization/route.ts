@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       .select('id, name, email, phone, role, position, mentor_role, sort_order, team_id, employee_type, is_active')
       .neq('is_active', false)
       .neq('name', 'admin')
-      .or('team_id.not.is.null,employee_type.eq.internal,employee_type.eq.partner')
+      .or('team_id.not.is.null,role.eq.admin,role.eq.editor,role.eq.employee')
       .order('sort_order'),
   ]);
 
@@ -111,7 +111,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (type === 'member') {
-    const { id, team_id, position, mentor_role, sort_order, employee_type } = body;
+    const { id, team_id, position, mentor_role, sort_order, employee_type, role } = body;
     if (!id) return NextResponse.json({ error: 'ID가 필요합니다.' }, { status: 400 });
 
     const updates: Record<string, unknown> = {};
@@ -120,6 +120,11 @@ export async function PATCH(request: NextRequest) {
     if (mentor_role !== undefined) updates.mentor_role = mentor_role;
     if (sort_order !== undefined) updates.sort_order = sort_order;
     if (employee_type !== undefined) updates.employee_type = employee_type;
+    if (role !== undefined) {
+      updates.role = role;
+      // role 변경 시 employee_type도 같이 업데이트
+      updates.employee_type = role === 'freelancer' ? 'freelancer' : 'internal';
+    }
 
     const { error } = await supabase.from('profiles').update(updates).eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

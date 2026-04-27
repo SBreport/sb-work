@@ -233,7 +233,13 @@ const CACHE_TTL = 60_000; // 60초
 
 /* ── 메인 페이지 ── */
 export default function OrganizationPage() {
-  const { profile, viewAsId, isViewingAs } = useAuth();
+  const { profile, viewAsId, viewAsRole, isViewingAs, loading: authLoading } = useAuth();
+
+  // 실제 프리랜서 OR 관리자가 프리랜서 미리보기 모드일 때 차단
+  const isFreelancerMode =
+    profile?.role === 'freelancer' ||
+    (isViewingAs && viewAsRole === 'freelancer');
+
   const [data, setData] = useState<OrgData | null>(orgCache?.data ?? null);
   const [loading, setLoading] = useState(!orgCache);
   const [error, setError] = useState<string | null>(null);
@@ -241,6 +247,8 @@ export default function OrganizationPage() {
   const myId = (isViewingAs ? viewAsId : profile?.id) ?? undefined;
 
   useEffect(() => {
+    if (isFreelancerMode) return; // 프리랜서면 API 호출 자체 차단
+
     const isFresh = orgCache && (Date.now() - orgCache.ts < CACHE_TTL);
     // 캐시가 유효하면 API 호출 생략
     if (isFresh) {
@@ -259,7 +267,19 @@ export default function OrganizationPage() {
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [isFreelancerMode]);
+
+  // 렌더링 가드 — 모든 hooks 선언 후
+  if (authLoading || !profile) {
+    return <div className="p-8 text-center text-gray-400">로딩 중...</div>;
+  }
+  if (isFreelancerMode) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-gray-400">이 페이지에 접근할 수 있는 권한이 없습니다.</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

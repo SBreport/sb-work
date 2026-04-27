@@ -246,9 +246,9 @@ export default function FreelancerPage() {
       main_writer:profiles!assignments_main_writer_id_fkey(name),
       sub_writer:profiles!assignments_sub_writer_id_fkey(name)`;
     const [curRes, prevRes, nextRes] = await Promise.all([
-      supabase.from('assignments').select(selectQuery).eq('month', month).order('renewal_day'),
-      supabase.from('assignments').select('branch_id, main_writer_id, sub_writer_id, optimal_writer_id, inbl_writer_id, main_quantity, sub_quantity, optimal_quantity, inbl_quantity').eq('month', prevMonth),
-      supabase.from('assignments').select('branch_id, main_writer_id, sub_writer_id, optimal_writer_id, inbl_writer_id, main_quantity, sub_quantity, optimal_quantity, inbl_quantity').eq('month', nextMonth),
+      supabase.from('assignments').select(selectQuery).eq('month', month).or(`main_writer_id.eq.${targetUserId},sub_writer_id.eq.${targetUserId},optimal_writer_id.eq.${targetUserId},inbl_writer_id.eq.${targetUserId}`).order('renewal_day'),
+      supabase.from('assignments').select('branch_id, main_writer_id, sub_writer_id, optimal_writer_id, inbl_writer_id, main_quantity, sub_quantity, optimal_quantity, inbl_quantity').eq('month', prevMonth).or(`main_writer_id.eq.${targetUserId},sub_writer_id.eq.${targetUserId},optimal_writer_id.eq.${targetUserId},inbl_writer_id.eq.${targetUserId}`),
+      supabase.from('assignments').select('branch_id, main_writer_id, sub_writer_id, optimal_writer_id, inbl_writer_id, main_quantity, sub_quantity, optimal_quantity, inbl_quantity').eq('month', nextMonth).or(`main_writer_id.eq.${targetUserId},sub_writer_id.eq.${targetUserId},optimal_writer_id.eq.${targetUserId},inbl_writer_id.eq.${targetUserId}`),
     ]);
     setAssignments(curRes.data || []);
     setPrevSummary(prevRes.data ? calcSummary(prevRes.data, targetUserId) : null);

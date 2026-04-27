@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth-guard';
 import { createServerSupabase } from '@/lib/supabase-server';
 
 export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request);
+  if (auth instanceof NextResponse) return auth;
+
   const supabase = createServerSupabase();
   const { searchParams } = new URL(request.url);
   const assignmentId = searchParams.get('assignment_id');

@@ -20,7 +20,6 @@ import {
   Network,
   ChevronDown,
   Settings,
-  UserCircle,
   Handshake,
   FolderOpen,
   KeyRound,
@@ -33,7 +32,6 @@ const PasswordChangeModal = dynamic(() => import('./PasswordChangeModal'), { ssr
 const commonMenuItems = [
   { href: '/notices', label: '공지사항', icon: Megaphone },
   { href: '/organization', label: '조직도', icon: Network },
-  { href: '/clients', label: '클라이언트', icon: UserCircle },
   { href: '/partners', label: '협력사', icon: Handshake },
   { href: '/library', label: '자료실', icon: FolderOpen },
 ];
@@ -192,7 +190,13 @@ export default function Sidebar({ onClose }: SidebarProps) {
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {/* ── 공통 메뉴 ── */}
-        {commonMenuItems.map(renderMenuItem)}
+        {(() => {
+          const hideFromFreelancer = isFreelancer || (isInViewMode && viewAsRole === 'freelancer');
+          const FREELANCER_HIDDEN = ['/organization', '/clients', '/partners'];
+          return commonMenuItems
+            .filter(item => !hideFromFreelancer || !FREELANCER_HIDDEN.includes(item.href))
+            .map(renderMenuItem);
+        })()}
 
         {/* ── 프리랜서 전용: 내 업무 ── */}
         {(isFreelancer || (isInViewMode && viewAsRole === 'freelancer')) && freelancerExtraItems.map(renderMenuItem)}

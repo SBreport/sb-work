@@ -1,1 +1,1 @@
-export { default } from '@/components/AuthLayout';
+export { default } from '@/components/FreelancerBlockLayout';

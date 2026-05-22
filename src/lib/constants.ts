@@ -5,9 +5,8 @@ export const ASSIGNMENT_STATUS_MAP: Record<string, { label: string; color: strin
   active: { label: '활성', color: 'text-gray-700', bg: 'bg-gray-100' },
   new: { label: '신규', color: 'text-green-700', bg: 'bg-green-100' },
   changed: { label: '변경', color: 'text-yellow-700', bg: 'bg-yellow-100' },
-  terminated: { label: '해지', color: 'text-red-700', bg: 'bg-red-100' },
-  ai: { label: 'AI', color: 'text-purple-700', bg: 'bg-purple-100' },
-  both: { label: '동시', color: 'text-blue-700', bg: 'bg-blue-100' },
+  suspended: { label: '중단', color: 'text-red-700', bg: 'bg-red-100' },
+  hold: { label: '보류', color: 'text-orange-700', bg: 'bg-orange-100' },
 };
 
 export const STATUS_OPTIONS = Object.entries(ASSIGNMENT_STATUS_MAP).map(

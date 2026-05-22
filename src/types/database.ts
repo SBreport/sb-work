@@ -1,6 +1,6 @@
 export type UserRole = 'admin' | 'editor' | 'employee' | 'freelancer' | 'partner';
 
-export type AssignmentStatus = 'active' | 'new' | 'changed' | 'terminated' | 'ai' | 'both';
+export type AssignmentStatus = 'active' | 'new' | 'changed' | 'suspended' | 'hold';
 
 export type OperationType = 'unai' | 'direct' | 'solution' | 'agency';
 

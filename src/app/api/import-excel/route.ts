@@ -379,10 +379,9 @@ export async function POST(request: NextRequest) {
   // progressStatus → AssignmentStatus 매핑
   const statusMap: Record<string, string> = {
     '신규': 'new',
-    '해지': 'terminated',
     '변경': 'changed',
-    'AI': 'ai',
-    '사수 부사수 동시': 'both',
+    '중단': 'suspended',
+    '보류': 'hold',
   };
 
   for (const row of rows) {
@@ -416,7 +415,7 @@ export async function POST(request: NextRequest) {
       inbl_writer_name: row.inblQuantity > 0 ? '스마트브랜딩' : null,
       inbl_quantity: row.inblQuantity,
       inbl_note: null,
-      status: (statusMap[row.progressStatus] || 'active') as 'active' | 'new' | 'changed' | 'terminated' | 'ai' | 'both',
+      status: (statusMap[row.progressStatus] || 'active') as 'active' | 'new' | 'changed' | 'suspended' | 'hold',
       product_type: row.productType || null,
       operation_type: row.operationType || null,
       partner_id: partnerId,

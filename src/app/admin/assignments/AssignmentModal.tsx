@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Assignment, User, Branch } from '@/types/database';
+import { STATUS_OPTIONS } from '@/lib/constants';
 import { X } from 'lucide-react';
 
 interface Props {
@@ -12,15 +13,6 @@ interface Props {
   onClose: () => void;
   onSave: () => void;
 }
-
-const STATUS_OPTIONS = [
-  { value: 'active', label: '활성' },
-  { value: 'new', label: '신규' },
-  { value: 'changed', label: '변경' },
-  { value: 'terminated', label: '해지' },
-  { value: 'ai', label: 'AI' },
-  { value: 'both', label: '사수부사수동시' },
-];
 
 export default function AssignmentModal({ assignment, month, writers, onClose, onSave }: Props) {
   const [branches, setBranches] = useState<Branch[]>([]);

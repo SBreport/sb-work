@@ -73,6 +73,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [showFreelancerList, setShowFreelancerList] = useState(false);
   const [showEmployeeList, setShowEmployeeList] = useState(false);
+  // 직원(또는 직원 미리보기)에게 배정된 업무가 있는지
+  const [employeeHasWork, setEmployeeHasWork] = useState(false);
   // 비밀번호 변경
   const [showPwModal, setShowPwModal] = useState(false);
   // must_change_password가 명시적으로 false가 아니면 → 비밀번호 미변경자로 간주
@@ -112,6 +114,23 @@ export default function Sidebar({ onClose }: SidebarProps) {
       .order('name')
       .then(({ data }) => setEmployees(data || []));
   }, [isAdmin]);
+
+  // 직원/직원 미리보기의 배정 유무 확인 → '내 업무' 메뉴 노출 판단
+  useEffect(() => {
+    const checkId = isViewingAs && viewAsRole === 'employee'
+      ? viewAsId
+      : (isEmployee ? profile?.id : null);
+    if (!checkId) {
+      setEmployeeHasWork(false);
+      return;
+    }
+    supabase
+      .from('assignments')
+      .select('id')
+      .or(`main_writer_id.eq.${checkId},sub_writer_id.eq.${checkId},optimal_writer_id.eq.${checkId},inbl_writer_id.eq.${checkId}`)
+      .limit(1)
+      .then(({ data }) => setEmployeeHasWork((data?.length ?? 0) > 0));
+  }, [isEmployee, profile?.id, isViewingAs, viewAsRole, viewAsId]);
 
   const handleViewAs = (id: string, role: 'freelancer' | 'employee', redirectTo: string) => {
     setViewAs(id, role);
@@ -199,7 +218,11 @@ export default function Sidebar({ onClose }: SidebarProps) {
         })()}
 
         {/* ── 프리랜서 전용: 내 업무 ── */}
-        {(isFreelancer || (isInViewMode && viewAsRole === 'freelancer')) && freelancerExtraItems.map(renderMenuItem)}
+        {(isFreelancer
+          || (isInViewMode && viewAsRole === 'freelancer')
+          || (isEmployee && employeeHasWork)
+          || (isInViewMode && viewAsRole === 'employee' && employeeHasWork)
+        ) && freelancerExtraItems.map(renderMenuItem)}
 
         {/* ── 관리자 메뉴 (admin/editor, 미리보기 모드가 아닐 때) ── */}
         {isAdmin && !isInViewMode && (

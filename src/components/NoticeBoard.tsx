@@ -58,10 +58,6 @@ export default function NoticeBoard({ month }: Props) {
       }
 
       setNotices(result);
-      // 최신 공지 자동 펼침
-      if (result.length > 0) {
-        setExpandedId(result[0].id);
-      }
     };
     fetchNotices();
   }, [month]);

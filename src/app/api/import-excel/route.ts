@@ -424,7 +424,12 @@ export async function POST(request: NextRequest) {
   }
 
   for (let i = 0; i < assignments.length; i += 50) {
-    await supabase.from('assignments').insert(assignments.slice(i, i + 50));
+    const { error: insertError } = await supabase.from('assignments').insert(assignments.slice(i, i + 50));
+    if (insertError) {
+      return NextResponse.json({
+        error: `배정 저장 실패 (${i + 1}~${Math.min(i + 50, assignments.length)}행): ${insertError.message}`,
+      }, { status: 500 });
+    }
   }
 
   return NextResponse.json({

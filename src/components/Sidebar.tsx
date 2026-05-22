@@ -132,12 +132,22 @@ export default function Sidebar({ onClose }: SidebarProps) {
       .then(({ data }) => setEmployeeHasWork((data?.length ?? 0) > 0));
   }, [isEmployee, profile?.id, isViewingAs, viewAsRole, viewAsId]);
 
-  const handleViewAs = (id: string, role: 'freelancer' | 'employee', redirectTo: string) => {
+  const handleViewAs = async (id: string, role: 'freelancer' | 'employee', redirectTo: string) => {
     setViewAs(id, role);
     setShowFreelancerList(false);
     setShowEmployeeList(false);
     setPreviewOpen(false);
-    router.push(redirectTo);
+    if (role === 'employee') {
+      // 직원 미리보기: 실제 로그인과 동일하게 — 배정 업무가 있으면 /my, 없으면 /notices
+      const { data } = await supabase
+        .from('assignments')
+        .select('id')
+        .or(`main_writer_id.eq.${id},sub_writer_id.eq.${id},optimal_writer_id.eq.${id},inbl_writer_id.eq.${id}`)
+        .limit(1);
+      router.push((data?.length ?? 0) > 0 ? '/my' : '/notices');
+    } else {
+      router.push(redirectTo);
+    }
   };
 
   const handleExitViewAs = () => {

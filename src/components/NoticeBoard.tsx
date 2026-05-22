@@ -39,10 +39,28 @@ export default function NoticeBoard({ month }: Props) {
       if (error) {
         console.error('notices fetch error:', error);
       }
-      setNotices(data || []);
+
+      let result = data || [];
+
+      // 표시할 공지가 없으면 → 가장 최근 활성 공지 1건을 fallback으로 노출 (월 태그 무관)
+      if (result.length === 0) {
+        const { data: latest, error: latestError } = await supabase
+          .from('notices')
+          .select('*')
+          .eq('is_active', true)
+          .order('is_pinned', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (latestError) {
+          console.error('notices fallback fetch error:', latestError);
+        }
+        result = latest || [];
+      }
+
+      setNotices(result);
       // 최신 공지 자동 펼침
-      if (data && data.length > 0) {
-        setExpandedId(data[0].id);
+      if (result.length > 0) {
+        setExpandedId(result[0].id);
       }
     };
     fetchNotices();

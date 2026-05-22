@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 
 export default function LoginPage() {
-  const [name, setName] = useState('');
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,18 +17,18 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
-    // 서버에서 별칭 해석 + 이름/이메일 검증을 모두 처리
+    // 서버에서 별칭 해석 + 이메일 검증 처리
     let email: string;
     try {
       const verifyRes = await fetch('/api/verify-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), id: id.trim() }),
+        body: JSON.stringify({ id: id.trim() }),
       });
 
       const data = await verifyRes.json();
       if (!verifyRes.ok) {
-        setError(data.error || '이름 또는 이메일이 올바르지 않습니다.');
+        setError(data.error || '이메일이 올바르지 않습니다.');
         setLoading(false);
         return;
       }
@@ -60,22 +59,6 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="login-name" className="block text-sm font-medium text-gray-700 mb-1">이름</label>
-            <input
-              id="login-name"
-              name="name"
-              type="text"
-              autoComplete="name"
-              value={name}
-              onChange={(e) => { setName(e.target.value); e.target.setCustomValidity(''); }}
-              onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('이름을 입력해주세요.')}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              placeholder="홍길동"
-              required
-            />
-          </div>
-
           <div>
             <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
             <input

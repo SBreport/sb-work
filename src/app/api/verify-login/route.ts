@@ -20,10 +20,10 @@ function resolveEmail(input: string): string {
   return lower;
 }
 
-// 이름 + ID(이메일/별칭) 매칭 검증
+// ID(이메일/별칭) 검증
 export async function POST(request: NextRequest) {
   const supabase = createServerSupabase();
-  const { name, id, email: legacyEmail } = await request.json();
+  const { id, email: legacyEmail } = await request.json();
 
   // id 필드 우선, 하위 호환으로 email 필드도 지원
   const rawId = id || '';
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '이메일을 입력해주세요.' }, { status: 400 });
   }
 
-  // 관리자 별칭인 경우 이름 검증 스킵
+  // 관리자 별칭인 경우 프로필 조회 스킵
   const aliases = getAliases();
   const isAlias = rawId && aliases[rawId.trim().toLowerCase()];
 
@@ -41,20 +41,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, email });
   }
 
-  if (!name) {
-    return NextResponse.json({ error: '이름을 입력해주세요.' }, { status: 400 });
-  }
-
-  // profiles 테이블에서 이름+이메일 매칭 확인
+  // profiles 테이블에서 이메일로 계정 확인
   const { data: profile, error } = await supabase
     .from('profiles')
     .select('id, name, email, is_active')
     .eq('email', email)
-    .eq('name', name.trim())
     .single();
 
   if (error || !profile) {
-    return NextResponse.json({ error: '이름 또는 이메일이 올바르지 않습니다.' }, { status: 401 });
+    return NextResponse.json({ error: '등록되지 않은 이메일입니다.' }, { status: 401 });
   }
 
   if (!profile.is_active) {

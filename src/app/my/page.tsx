@@ -755,6 +755,7 @@ export default function FreelancerPage() {
                       ) : (
                         <SortHeader label="포스팅" sortKeyName="qty" className="text-center w-16" />
                       )}
+                      <th className="px-2 py-2 font-medium text-gray-500 text-xs whitespace-nowrap text-center">진행여부</th>
                       <th className="px-3 py-2 text-left font-medium text-gray-500 text-xs whitespace-nowrap">함께하는 담당자</th>
                     </tr>
                   </thead>
@@ -773,8 +774,7 @@ export default function FreelancerPage() {
                           </td>
                           <td className="px-2 py-1.5 font-medium text-gray-900 whitespace-nowrap">
                             {a.branch?.name || '-'}
-                            {a.status !== 'active' && <span className="ml-1.5 align-middle"><StatusBadge status={a.status} /></span>}
-                            {a.isNew && <span className="ml-1.5 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded text-[10px] font-semibold">신규</span>}
+                            {a.isNew && a.status !== 'new' && <span className="ml-1.5 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded text-[10px] font-semibold">신규 배정</span>}
                           </td>
                           {isReviewer ? (
                             <>
@@ -802,6 +802,11 @@ export default function FreelancerPage() {
                               )}
                             </td>
                           )}
+                          <td className="px-2 py-1.5 text-center">
+                            {a.status !== 'active'
+                              ? <StatusBadge status={a.status} />
+                              : <span className="text-[11px] text-gray-400">진행</span>}
+                          </td>
                           <td className="px-3 py-1.5">{renderPartner(a)}</td>
                         </tr>
                       );
@@ -821,7 +826,7 @@ export default function FreelancerPage() {
                           <p className="font-semibold text-gray-900 text-sm">
                             {a.branch?.name || '-'}
                             {a.status !== 'active' && <span className="ml-1.5 align-middle"><StatusBadge status={a.status} /></span>}
-                            {a.isNew && <span className="ml-1.5 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded text-[10px] font-semibold align-middle">신규</span>}
+                            {a.isNew && a.status !== 'new' && <span className="ml-1.5 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded text-[10px] font-semibold align-middle">신규 배정</span>}
                           </p>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className={`px-1.5 py-0.5 rounded border text-[11px] ${catColors[clean(a.branch?.category)] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>

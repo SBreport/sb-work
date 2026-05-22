@@ -7,6 +7,7 @@ import { getCurrentMonth, getAdjacentMonth, shortMonthLabel } from '@/lib/date';
 import MonthSelector from '@/components/MonthSelector';
 import type { Assignment } from '@/types/database';
 import NoticeBoard from '@/components/NoticeBoard';
+import StatusBadge from '@/components/StatusBadge';
 import { Briefcase, ChevronUp, ChevronDown, LayoutList, LayoutGrid } from 'lucide-react';
 function clean(val: string | null | undefined): string {
   return (val || '').replace(/,/g, '').trim();
@@ -772,6 +773,7 @@ export default function FreelancerPage() {
                           </td>
                           <td className="px-2 py-1.5 font-medium text-gray-900 whitespace-nowrap">
                             {a.branch?.name || '-'}
+                            {a.status !== 'active' && <span className="ml-1.5 align-middle"><StatusBadge status={a.status} /></span>}
                             {a.isNew && <span className="ml-1.5 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded text-[10px] font-semibold">신규</span>}
                           </td>
                           {isReviewer ? (
@@ -818,6 +820,7 @@ export default function FreelancerPage() {
                         <div>
                           <p className="font-semibold text-gray-900 text-sm">
                             {a.branch?.name || '-'}
+                            {a.status !== 'active' && <span className="ml-1.5 align-middle"><StatusBadge status={a.status} /></span>}
                             {a.isNew && <span className="ml-1.5 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded text-[10px] font-semibold align-middle">신규</span>}
                           </p>
                           <div className="flex items-center gap-1.5 mt-0.5">

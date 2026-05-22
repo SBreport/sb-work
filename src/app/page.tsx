@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { supabase } from '@/lib/supabase';
 
 export default function Home() {
   const { user, profile, loading } = useAuth();
@@ -32,7 +33,13 @@ export default function Home() {
     if (profile?.role === 'admin' || profile?.role === 'editor') {
       router.push('/admin/dashboard');
     } else if (profile?.role === 'employee') {
-      router.push('/notices');
+      // 직원: 배정된 업무가 있으면 /my, 없으면 /notices
+      supabase
+        .from('assignments')
+        .select('id')
+        .or(`main_writer_id.eq.${profile.id},sub_writer_id.eq.${profile.id},optimal_writer_id.eq.${profile.id},inbl_writer_id.eq.${profile.id}`)
+        .limit(1)
+        .then(({ data }) => router.push((data?.length ?? 0) > 0 ? '/my' : '/notices'));
     } else {
       router.push('/my');
     }

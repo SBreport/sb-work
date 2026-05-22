@@ -381,6 +381,7 @@ export async function POST(request: NextRequest) {
     '신규': 'new',
     '변경': 'changed',
     '중단': 'suspended',
+    '해지': 'suspended',  // '해지'는 '중단'과 동일 처리
     '보류': 'hold',
   };
 

@@ -11,7 +11,7 @@ import InlineEditCell from '@/components/InlineEditCell';
 import InlineSelectCell from '@/components/InlineSelectCell';
 import AssignmentModal from './AssignmentModal';
 import type { Assignment, User, AssignmentStatus } from '@/types/database';
-import { Plus, Copy, Download, Trash2, History } from 'lucide-react';
+import { Plus, Copy, Download, Trash2, History, X } from 'lucide-react';
 import { STATUS_OPTIONS } from '@/lib/constants';
 import { calcWriterStats, totalQty } from '@/lib/stats';
 
@@ -38,6 +38,9 @@ export default function AssignmentsPage() {
   // 셀 편집 대기 상태 — assignmentId별로 변경된 필드만 누적
   const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<Assignment>>>({});
   const [saving, setSaving] = useState(false);
+  const [filterWriterKey, setFilterWriterKey] = useState<string | null>(null);
+  type SortKey = 'name' | 'mainQty' | 'subQty' | 'optimalQty' | 'inblQty' | 'total' | 'branchCount';
+  const [statSort, setStatSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'total', dir: 'desc' });
 
   const fetchAssignments = useCallback(async () => {
     setLoading(true);
@@ -235,6 +238,37 @@ export default function AssignmentsPage() {
   // 담당자별 수량 집계 — pending 변경사항 반영된 displayAssignments 기준
   const writerSummary = useMemo(() => calcWriterStats(displayAssignments), [displayAssignments]);
 
+  // 정렬된 summary (집계 테이블용)
+  const sortedSummary = useMemo(() => {
+    const entries = Object.entries(writerSummary);
+    const { key, dir } = statSort;
+    entries.sort(([, a], [, b]) => {
+      let av: number | string;
+      let bv: number | string;
+      if (key === 'total') { av = totalQty(a); bv = totalQty(b); }
+      else if (key === 'name') { av = a.name; bv = b.name; }
+      else { av = a[key as keyof typeof a] as number; bv = b[key as keyof typeof b] as number; }
+      const cmp = typeof av === 'string'
+        ? av.localeCompare(bv as string, 'ko')
+        : (av as number) - (bv as number);
+      return dir === 'asc' ? cmp : -cmp;
+    });
+    return entries;
+  }, [writerSummary, statSort]);
+
+  // 필터된 배정 목록 (배정 테이블 본문용)
+  const filteredAssignments = useMemo(() => {
+    if (!filterWriterKey) return displayAssignments;
+    const isNameKey = filterWriterKey.startsWith('name:');
+    const target = isNameKey ? filterWriterKey.slice(5) : filterWriterKey;
+    return displayAssignments.filter(a => {
+      if (isNameKey) {
+        return [a.main_writer_name, a.sub_writer_name, a.optimal_writer_name, a.inbl_writer_name].includes(target);
+      }
+      return [a.main_writer_id, a.sub_writer_id, a.optimal_writer_id, a.inbl_writer_id].includes(target);
+    });
+  }, [displayAssignments, filterWriterKey]);
+
   const getWriterDisplay = (writer: unknown, name: string | null | undefined, role: string) => {
     const writerName = (writer as { name?: string; id?: string } | null)?.name || name;
     const writerId = (writer as { id?: string } | null)?.id || '';
@@ -311,25 +345,70 @@ export default function AssignmentsPage() {
 
       {/* 담당자별 수량 집계 — 테이블 위 */}
       {Object.keys(writerSummary).length > 0 && (
-        <div className="mb-4 bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="text-xs font-semibold text-gray-700 mb-3">담당자별 수량 집계</h3>
-          <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-2">
-            {Object.entries(writerSummary)
-              .sort((a, b) => totalQty(b[1]) - totalQty(a[1]))
-              .map(([id, s]) => (
-                <div key={id} className="bg-gray-50 rounded-lg p-2.5">
-                  <p className="font-medium text-gray-900 text-xs">{s.name}</p>
-                  <div className="flex flex-wrap gap-1 mt-1 text-xs">
-                    {s.mainQty > 0 && <span className="text-blue-600">사{s.mainQty}</span>}
-                    {s.subQty > 0 && <span className="text-green-600">부{s.subQty}</span>}
-                    {s.optimalQty > 0 && <span className="text-purple-600">최{s.optimalQty}</span>}
-                    {s.inblQty > 0 && <span className="text-amber-600">인{s.inblQty}</span>}
-                  </div>
-                  <p className="text-xs font-semibold text-gray-600 mt-0.5">
-                    합 {totalQty(s)}
-                  </p>
+        <div className="mb-4 bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200">
+            <h3 className="text-xs font-semibold text-gray-700">담당자별 수량 집계</h3>
+            {filterWriterKey && (() => {
+              const stat = writerSummary[filterWriterKey];
+              return (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-blue-700 font-medium">{stat?.name ?? ''}님 필터</span>
+                  <button
+                    onClick={() => setFilterWriterKey(null)}
+                    className="text-blue-500 hover:text-blue-700"
+                    aria-label="필터 해제"
+                  >
+                    <X size={12} />
+                  </button>
                 </div>
-              ))}
+              );
+            })()}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50/50">
+                <tr>
+                  {(([
+                    ['name', '담당자', 'text-gray-600', 'text-left'],
+                    ['mainQty', '사수', 'text-blue-600', 'text-right'],
+                    ['subQty', '부사수', 'text-green-600', 'text-right'],
+                    ['optimalQty', '최적', 'text-purple-600', 'text-right'],
+                    ['inblQty', '인블', 'text-amber-600', 'text-right'],
+                    ['total', '합계', 'text-gray-700', 'text-right'],
+                    ['branchCount', '지점', 'text-gray-500', 'text-right'],
+                  ] as Array<[SortKey, string, string, string]>)).map(([key, label, color, align]) => (
+                    <th
+                      key={key}
+                      onClick={() => setStatSort(s => s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'name' ? 'asc' : 'desc' })}
+                      className={`px-3 py-2 font-semibold ${color} ${align} cursor-pointer hover:bg-gray-100 whitespace-nowrap select-none`}
+                    >
+                      {label}
+                      {statSort.key === key && <span className="ml-1 text-[10px]">{statSort.dir === 'asc' ? '▲' : '▼'}</span>}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {sortedSummary.map(([key, s]) => {
+                  const isSelected = filterWriterKey === key;
+                  return (
+                    <tr
+                      key={key}
+                      onClick={() => setFilterWriterKey(isSelected ? null : key)}
+                      className={`cursor-pointer ${isSelected ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'}`}
+                    >
+                      <td className="px-3 py-1.5 font-medium text-gray-900 whitespace-nowrap">{s.name}</td>
+                      <td className="px-3 py-1.5 text-right text-blue-600 whitespace-nowrap">{s.mainQty > 0 ? s.mainQty : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-3 py-1.5 text-right text-green-600 whitespace-nowrap">{s.subQty > 0 ? s.subQty : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-3 py-1.5 text-right text-purple-600 whitespace-nowrap">{s.optimalQty > 0 ? s.optimalQty : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-3 py-1.5 text-right text-amber-600 whitespace-nowrap">{s.inblQty > 0 ? s.inblQty : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-3 py-1.5 text-right font-bold text-gray-900 whitespace-nowrap">{totalQty(s)}</td>
+                      <td className="px-3 py-1.5 text-right text-gray-500 whitespace-nowrap">{s.branchCount}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -343,26 +422,22 @@ export default function AssignmentsPage() {
                 <th className="px-2 py-2.5 text-left font-semibold text-gray-600 w-14">갱신일</th>
                 <th className="px-2 py-2.5 text-left font-semibold text-gray-600 w-20">과목</th>
                 <th className="px-2 py-2.5 text-left font-semibold text-gray-600">지점명</th>
-                <th className="px-2 py-2.5 text-left font-semibold text-blue-600 w-20">사수</th>
-                <th className="px-2 py-2.5 text-center font-semibold text-blue-600 w-12">수량</th>
-                <th className="px-2 py-2.5 text-left font-semibold text-green-600 w-20">부사수</th>
-                <th className="px-2 py-2.5 text-center font-semibold text-green-600 w-12">수량</th>
-                <th className="px-2 py-2.5 text-left font-semibold text-purple-600 w-20">최적</th>
-                <th className="px-2 py-2.5 text-center font-semibold text-purple-600 w-12">수량</th>
-                <th className="px-2 py-2.5 text-left font-semibold text-amber-600 w-20">인블</th>
-                <th className="px-2 py-2.5 text-center font-semibold text-amber-600 w-12">수량</th>
-                <th className="px-2 py-2.5 text-center font-semibold text-gray-600 w-14">상태</th>
+                <th className="px-2 py-2.5 text-left font-semibold text-blue-600 w-32 whitespace-nowrap">사수</th>
+                <th className="px-2 py-2.5 text-left font-semibold text-green-600 w-32 whitespace-nowrap">부사수</th>
+                <th className="px-2 py-2.5 text-left font-semibold text-purple-600 w-32 whitespace-nowrap">최적</th>
+                <th className="px-2 py-2.5 text-left font-semibold text-amber-600 w-36 whitespace-nowrap">인블</th>
+                <th className="px-2 py-2.5 text-center font-semibold text-gray-600 w-16">상태</th>
                 <th className="px-2 py-2.5 text-left font-semibold text-gray-600">비고</th>
                 {!isEditor && <th className="px-2 py-2.5 text-center font-semibold text-gray-600 w-8"></th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={14} className="px-4 py-8 text-center text-gray-400">로딩 중...</td></tr>
-              ) : displayAssignments.length === 0 ? (
-                <tr><td colSpan={14} className="px-4 py-8 text-center text-gray-400">배정 데이터가 없습니다.</td></tr>
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">로딩 중...</td></tr>
+              ) : filteredAssignments.length === 0 ? (
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">배정 데이터가 없습니다.</td></tr>
               ) : (
-                displayAssignments.map((a) => {
+                filteredAssignments.map((a) => {
                   const main = getWriterDisplay(a.main_writer, a.main_writer_name, 'main');
                   const sub = getWriterDisplay(a.sub_writer, a.sub_writer_name, 'sub');
                   const opt = getWriterDisplay(a.optimal_writer, a.optimal_writer_name, 'optimal');
@@ -417,36 +492,52 @@ export default function AssignmentsPage() {
                       <td className="px-2 py-1.5 font-medium text-gray-900">
                         {a.branch?.name}
                       </td>
-                      {/* 사수 */}
-                      <td className="px-2 py-1.5">
-                        {renderWriterCell(main.writerName, main.colorClass, a.main_writer_id || '', 'main')}
+                      {/* 사수 (이름+수량 통합) */}
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1 truncate">
+                            {renderWriterCell(main.writerName, main.colorClass, a.main_writer_id || '', 'main')}
+                          </div>
+                          <div className="text-blue-600 font-semibold text-right shrink-0 w-8">
+                            {isEditor ? <span>{a.main_quantity}</span> : <InlineEditCell value={a.main_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'main_quantity', v)} />}
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-2 py-1.5 text-center">
-                        {isEditor ? <span>{a.main_quantity}</span> : <InlineEditCell value={a.main_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'main_quantity', v)} />}
+                      {/* 부사수 (이름+수량 통합) */}
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1 truncate">
+                            {renderWriterCell(sub.writerName, sub.colorClass, a.sub_writer_id || '', 'sub')}
+                          </div>
+                          <div className="text-green-600 font-semibold text-right shrink-0 w-8">
+                            {isEditor ? <span>{a.sub_quantity}</span> : <InlineEditCell value={a.sub_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'sub_quantity', v)} />}
+                          </div>
+                        </div>
                       </td>
-                      {/* 부사수 */}
-                      <td className="px-2 py-1.5">
-                        {renderWriterCell(sub.writerName, sub.colorClass, a.sub_writer_id || '', 'sub')}
+                      {/* 최적배포 (이름+수량 통합) */}
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1 truncate">
+                            {renderWriterCell(opt.writerName, opt.colorClass, a.optimal_writer_id || '', 'optimal')}
+                          </div>
+                          <div className="text-purple-600 font-semibold text-right shrink-0 w-8">
+                            {isEditor ? <span>{a.optimal_quantity}</span> : <InlineEditCell value={a.optimal_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'optimal_quantity', v)} />}
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-2 py-1.5 text-center">
-                        {isEditor ? <span>{a.sub_quantity}</span> : <InlineEditCell value={a.sub_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'sub_quantity', v)} />}
-                      </td>
-                      {/* 최적배포 */}
-                      <td className="px-2 py-1.5">
-                        {renderWriterCell(opt.writerName, opt.colorClass, a.optimal_writer_id || '', 'optimal')}
-                      </td>
-                      <td className="px-2 py-1.5 text-center">
-                        {isEditor ? <span>{a.optimal_quantity}</span> : <InlineEditCell value={a.optimal_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'optimal_quantity', v)} />}
-                      </td>
-                      {/* 인블 */}
-                      <td className="px-2 py-1.5">
-                        {renderWriterCell(inbl.writerName, inbl.colorClass, a.inbl_writer_id || '', 'inbl')}
-                      </td>
-                      <td className="px-2 py-1.5 text-center">
-                        {isEditor ? <span>{a.inbl_quantity}</span> : <InlineEditCell value={a.inbl_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'inbl_quantity', v)} />}
+                      {/* 인블 (이름+수량 통합) */}
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1 truncate">
+                            {renderWriterCell(inbl.writerName, inbl.colorClass, a.inbl_writer_id || '', 'inbl')}
+                          </div>
+                          <div className="text-amber-600 font-semibold text-right shrink-0 w-8">
+                            {isEditor ? <span>{a.inbl_quantity}</span> : <InlineEditCell value={a.inbl_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'inbl_quantity', v)} />}
+                          </div>
+                        </div>
                       </td>
                       {/* 상태 */}
-                      <td className="px-2 py-1.5 text-center">
+                      <td className="px-2 py-1.5 text-center whitespace-nowrap">
                         {isEditor ? (
                           <StatusBadge status={a.status as AssignmentStatus} />
                         ) : (

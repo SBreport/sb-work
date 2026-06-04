@@ -12,7 +12,7 @@ import InlineSelectCell from '@/components/InlineSelectCell';
 import AssignmentModal from './AssignmentModal';
 import type { Assignment, User, AssignmentStatus } from '@/types/database';
 import { Plus, Copy, Download, Trash2, History, X } from 'lucide-react';
-import { STATUS_OPTIONS } from '@/lib/constants';
+import { STATUS_OPTIONS, ASSIGNMENT_STATUS_MAP } from '@/lib/constants';
 import { calcWriterStats, totalQty } from '@/lib/stats';
 
 interface LogEntry {
@@ -24,6 +24,113 @@ interface LogEntry {
   changed_at: string;
   changed_by_profile?: { name: string } | null;
 }
+
+// ── 헬퍼 함수 ──────────────────────────────────────────────
+
+function operationTypeLabel(v: string): string {
+  const map: Record<string, string> = {
+    unai: '유앤아이',
+    direct: '직',
+    solution: '솔루션',
+    agency: '대행',
+  };
+  return map[v] || v;
+}
+
+function statusLabel(v: string): string {
+  return ASSIGNMENT_STATUS_MAP[v]?.label ?? v;
+}
+
+// ── ChipRow 인라인 컴포넌트 ──────────────────────────────────
+
+function ChipRow({
+  label,
+  items,
+  activeValue,
+  onClick,
+  formatItem,
+  colorClass,
+  activeColorClass,
+}: {
+  label: string;
+  items: [string, number][];
+  activeValue: string | null;
+  onClick: (value: string) => void;
+  formatItem?: (value: string) => string;
+  colorClass: string;
+  activeColorClass: string;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="flex items-start gap-2 text-xs">
+      <span className="font-semibold text-gray-500 shrink-0 w-10 mt-1">{label}</span>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map(([value, count]) => {
+          const isActive = activeValue === value;
+          return (
+            <button
+              key={value}
+              onClick={() => onClick(value)}
+              className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${isActive ? activeColorClass : colorClass}`}
+            >
+              {formatItem ? formatItem(value) : value}{' '}
+              <span className="font-normal opacity-70">{count}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── SortableHeaderCell 인라인 컴포넌트 ──────────────────────
+
+type SortKey = 'name' | 'mainQty' | 'subQty' | 'optimalQty' | 'inblQty' | 'total' | 'branchCount';
+
+function SortableHeaderCell({
+  sortKey,
+  current,
+  onSort,
+  align,
+  color,
+  children,
+}: {
+  sortKey: SortKey;
+  current: { key: SortKey; dir: 'asc' | 'desc' };
+  onSort: (s: { key: SortKey; dir: 'asc' | 'desc' }) => void;
+  align: 'left' | 'right';
+  color: string;
+  children: React.ReactNode;
+}) {
+  const isActive = current.key === sortKey;
+  return (
+    <th
+      onClick={() =>
+        onSort(
+          isActive
+            ? { key: sortKey, dir: current.dir === 'asc' ? 'desc' : 'asc' }
+            : { key: sortKey, dir: sortKey === 'name' ? 'asc' : 'desc' }
+        )
+      }
+      className={`px-3 py-2 font-semibold ${color} text-${align} cursor-pointer hover:bg-gray-100 whitespace-nowrap select-none`}
+    >
+      {children}
+      {isActive && (
+        <span className="ml-1 text-[10px]">{current.dir === 'asc' ? '▲' : '▼'}</span>
+      )}
+    </th>
+  );
+}
+
+// ── 통합 필터 타입 ──────────────────────────────────────────
+
+type ActiveFilter =
+  | { type: 'writer'; key: string; label: string }
+  | { type: 'category'; value: string }
+  | { type: 'operationType'; value: string }
+  | { type: 'status'; value: AssignmentStatus };
+
+// ── 메인 컴포넌트 ───────────────────────────────────────────
 
 export default function AssignmentsPage() {
   const { user, isEditor } = useAuth();
@@ -38,9 +145,16 @@ export default function AssignmentsPage() {
   // 셀 편집 대기 상태 — assignmentId별로 변경된 필드만 누적
   const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<Assignment>>>({});
   const [saving, setSaving] = useState(false);
-  const [filterWriterKey, setFilterWriterKey] = useState<string | null>(null);
-  type SortKey = 'name' | 'mainQty' | 'subQty' | 'optimalQty' | 'inblQty' | 'total' | 'branchCount';
-  const [statSort, setStatSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'total', dir: 'desc' });
+
+  // 통합 필터
+  const [filter, setFilter] = useState<ActiveFilter | null>(null);
+  // 집계 탭
+  const [statTab, setStatTab] = useState<'branch' | 'writer'>('branch');
+  // 담당자별 탭 정렬
+  const [statSort, setStatSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({
+    key: 'total',
+    dir: 'desc',
+  });
 
   const fetchAssignments = useCallback(async () => {
     setLoading(true);
@@ -75,9 +189,10 @@ export default function AssignmentsPage() {
     fetchWriters();
   }, [fetchAssignments, fetchWriters]);
 
-  // 월 변경 시 pending 초기화
+  // 월 변경 시 pending + 필터 초기화
   useEffect(() => {
     setPendingChanges({});
+    setFilter(null);
   }, [month]);
 
   // 페이지 떠나기 경고
@@ -128,8 +243,12 @@ export default function AssignmentsPage() {
       await Promise.all(
         entries.map(([id, fields]) => {
           // writer 객체 필드는 API에 보내지 않음 (DB 컬럼 아님)
-          const { main_writer, sub_writer, optimal_writer, inbl_writer, ...dbFields } = fields as Record<string, unknown>;
-          void main_writer; void sub_writer; void optimal_writer; void inbl_writer;
+          const { main_writer, sub_writer, optimal_writer, inbl_writer, ...dbFields } =
+            fields as Record<string, unknown>;
+          void main_writer;
+          void sub_writer;
+          void optimal_writer;
+          void inbl_writer;
           if (Object.keys(dbFields).length === 0) return Promise.resolve();
           return authFetch('/api/assignments/update', {
             method: 'POST',
@@ -175,7 +294,10 @@ export default function AssignmentsPage() {
     const [year, mon] = month.split('-').map(Number);
     let prevMonth = mon - 1;
     let prevYear = year;
-    if (prevMonth < 1) { prevMonth = 12; prevYear--; }
+    if (prevMonth < 1) {
+      prevMonth = 12;
+      prevYear--;
+    }
     const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
 
     if (!confirm(`${prevYear}년 ${prevMonth}월 데이터를 현재 월로 복사하시겠습니까?`)) return;
@@ -203,7 +325,22 @@ export default function AssignmentsPage() {
   const handleExportCSV = () => {
     if (assignments.length === 0) return;
 
-    const headers = ['갱신일', '과목', '유형', '지점명', '사수', '사수수량', '부사수', '부사수수량', '최적배포', '최적수량', '인블', '인블수량', '상태', '비고'];
+    const headers = [
+      '갱신일',
+      '과목',
+      '유형',
+      '지점명',
+      '사수',
+      '사수수량',
+      '부사수',
+      '부사수수량',
+      '최적배포',
+      '최적수량',
+      '인블',
+      '인블수량',
+      '상태',
+      '비고',
+    ];
     const rows = assignments.map(a => [
       `${a.renewal_day}일`,
       (a.branch?.category || '').replace(/,/g, ''),
@@ -221,8 +358,12 @@ export default function AssignmentsPage() {
       a.note || '',
     ]);
 
-    const bom = '\uFEFF';
-    const csv = bom + [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const bom = '﻿';
+    const csv =
+      bom +
+      [headers, ...rows]
+        .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -238,36 +379,104 @@ export default function AssignmentsPage() {
   // 담당자별 수량 집계 — pending 변경사항 반영된 displayAssignments 기준
   const writerSummary = useMemo(() => calcWriterStats(displayAssignments), [displayAssignments]);
 
-  // 정렬된 summary (집계 테이블용)
+  // 정렬된 summary (담당자별 탭용)
   const sortedSummary = useMemo(() => {
     const entries = Object.entries(writerSummary);
     const { key, dir } = statSort;
     entries.sort(([, a], [, b]) => {
       let av: number | string;
       let bv: number | string;
-      if (key === 'total') { av = totalQty(a); bv = totalQty(b); }
-      else if (key === 'name') { av = a.name; bv = b.name; }
-      else { av = a[key as keyof typeof a] as number; bv = b[key as keyof typeof b] as number; }
-      const cmp = typeof av === 'string'
-        ? av.localeCompare(bv as string, 'ko')
-        : (av as number) - (bv as number);
+      if (key === 'total') {
+        av = totalQty(a);
+        bv = totalQty(b);
+      } else if (key === 'name') {
+        av = a.name;
+        bv = b.name;
+      } else {
+        av = a[key as keyof typeof a] as number;
+        bv = b[key as keyof typeof b] as number;
+      }
+      const cmp =
+        typeof av === 'string'
+          ? av.localeCompare(bv as string, 'ko')
+          : (av as number) - (bv as number);
       return dir === 'asc' ? cmp : -cmp;
     });
     return entries;
   }, [writerSummary, statSort]);
 
-  // 필터된 배정 목록 (배정 테이블 본문용)
+  // 지점별 집계
+  const branchStats = useMemo(() => {
+    const branchIds = new Set<string>();
+    const categoryCount: Record<string, number> = {};
+    const operationCount: Record<string, number> = {};
+    const statusCount: Record<string, number> = {};
+
+    for (const a of displayAssignments) {
+      if (a.branch_id) branchIds.add(a.branch_id);
+      const cat = a.branch?.category ?? '';
+      if (cat) categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+      const op = a.operation_type ?? '';
+      if (op) operationCount[op] = (operationCount[op] || 0) + 1;
+      const st = a.status;
+      if (st) statusCount[st] = (statusCount[st] || 0) + 1;
+    }
+
+    return {
+      totalBranches: branchIds.size,
+      totalAssignments: displayAssignments.length,
+      categories: Object.entries(categoryCount).sort((a, b) => b[1] - a[1]),
+      operations: Object.entries(operationCount).sort((a, b) => b[1] - a[1]),
+      statuses: Object.entries(statusCount).sort((a, b) => b[1] - a[1]),
+    };
+  }, [displayAssignments]);
+
+  // 통합 필터 적용된 배정 목록
   const filteredAssignments = useMemo(() => {
-    if (!filterWriterKey) return displayAssignments;
-    const isNameKey = filterWriterKey.startsWith('name:');
-    const target = isNameKey ? filterWriterKey.slice(5) : filterWriterKey;
+    if (!filter) return displayAssignments;
     return displayAssignments.filter(a => {
-      if (isNameKey) {
-        return [a.main_writer_name, a.sub_writer_name, a.optimal_writer_name, a.inbl_writer_name].includes(target);
+      switch (filter.type) {
+        case 'writer': {
+          const isNameKey = filter.key.startsWith('name:');
+          const target = isNameKey ? filter.key.slice(5) : filter.key;
+          if (isNameKey)
+            return [
+              a.main_writer_name,
+              a.sub_writer_name,
+              a.optimal_writer_name,
+              a.inbl_writer_name,
+            ].includes(target);
+          return [
+            a.main_writer_id,
+            a.sub_writer_id,
+            a.optimal_writer_id,
+            a.inbl_writer_id,
+          ].includes(target);
+        }
+        case 'category':
+          return (a.branch?.category ?? '') === filter.value;
+        case 'operationType':
+          return (a.operation_type ?? '') === filter.value;
+        case 'status':
+          return a.status === filter.value;
       }
-      return [a.main_writer_id, a.sub_writer_id, a.optimal_writer_id, a.inbl_writer_id].includes(target);
     });
-  }, [displayAssignments, filterWriterKey]);
+  }, [displayAssignments, filter]);
+
+  // 활성 필터 표시 레이블
+  const filterLabel = useMemo(() => {
+    if (!filter) return null;
+    switch (filter.type) {
+      case 'writer':
+        return `${filter.label}님 필터`;
+      case 'category':
+        return `${filter.value} 필터`;
+      case 'operationType':
+        return `${operationTypeLabel(filter.value)} 필터`;
+      case 'status':
+        return `${statusLabel(filter.value)} 필터`;
+    }
+  }, [filter]);
 
   const getWriterDisplay = (writer: unknown, name: string | null | undefined, role: string) => {
     const writerName = (writer as { name?: string; id?: string } | null)?.name || name;
@@ -343,72 +552,188 @@ export default function AssignmentsPage() {
       {/* 인라인 편집 안내 */}
       {!isEditor && <p className="text-xs text-gray-400 mb-2">셀을 클릭하면 바로 수정할 수 있습니다.</p>}
 
-      {/* 담당자별 수량 집계 — 테이블 위 */}
-      {Object.keys(writerSummary).length > 0 && (
+      {/* ── 집계 영역 (탭 토글) ── */}
+      {displayAssignments.length > 0 && (
         <div className="mb-4 bg-white rounded-lg border border-gray-200 overflow-hidden">
+          {/* 헤더: 탭 + 활성 필터 표시 */}
           <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200">
-            <h3 className="text-xs font-semibold text-gray-700">담당자별 수량 집계</h3>
-            {filterWriterKey && (() => {
-              const stat = writerSummary[filterWriterKey];
-              return (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-blue-700 font-medium">{stat?.name ?? ''}님 필터</span>
-                  <button
-                    onClick={() => setFilterWriterKey(null)}
-                    className="text-blue-500 hover:text-blue-700"
-                    aria-label="필터 해제"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              );
-            })()}
+            <div className="flex gap-1">
+              {(['branch', 'writer'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setStatTab(t)}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded ${
+                    statTab === t
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  {t === 'branch' ? '지점별 확인' : '담당자별 확인'}
+                </button>
+              ))}
+            </div>
+            {filter && filterLabel && (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-blue-700 font-medium">{filterLabel}</span>
+                <button
+                  onClick={() => setFilter(null)}
+                  className="text-blue-500 hover:text-blue-700"
+                  aria-label="필터 해제"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-gray-50/50">
-                <tr>
-                  {(([
-                    ['name', '담당자', 'text-gray-600', 'text-left'],
-                    ['mainQty', '사수', 'text-blue-600', 'text-right'],
-                    ['subQty', '부사수', 'text-green-600', 'text-right'],
-                    ['optimalQty', '최적', 'text-purple-600', 'text-right'],
-                    ['inblQty', '인블', 'text-amber-600', 'text-right'],
-                    ['total', '합계', 'text-gray-700', 'text-right'],
-                    ['branchCount', '지점', 'text-gray-500', 'text-right'],
-                  ] as Array<[SortKey, string, string, string]>)).map(([key, label, color, align]) => (
-                    <th
-                      key={key}
-                      onClick={() => setStatSort(s => s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'name' ? 'asc' : 'desc' })}
-                      className={`px-3 py-2 font-semibold ${color} ${align} cursor-pointer hover:bg-gray-100 whitespace-nowrap select-none`}
-                    >
-                      {label}
-                      {statSort.key === key && <span className="ml-1 text-[10px]">{statSort.dir === 'asc' ? '▲' : '▼'}</span>}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {sortedSummary.map(([key, s]) => {
-                  const isSelected = filterWriterKey === key;
-                  return (
-                    <tr
-                      key={key}
-                      onClick={() => setFilterWriterKey(isSelected ? null : key)}
-                      className={`cursor-pointer ${isSelected ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'}`}
-                    >
-                      <td className="px-3 py-1.5 font-medium text-gray-900 whitespace-nowrap">{s.name}</td>
-                      <td className="px-3 py-1.5 text-right text-blue-600 whitespace-nowrap">{s.mainQty > 0 ? s.mainQty : <span className="text-gray-300">—</span>}</td>
-                      <td className="px-3 py-1.5 text-right text-green-600 whitespace-nowrap">{s.subQty > 0 ? s.subQty : <span className="text-gray-300">—</span>}</td>
-                      <td className="px-3 py-1.5 text-right text-purple-600 whitespace-nowrap">{s.optimalQty > 0 ? s.optimalQty : <span className="text-gray-300">—</span>}</td>
-                      <td className="px-3 py-1.5 text-right text-amber-600 whitespace-nowrap">{s.inblQty > 0 ? s.inblQty : <span className="text-gray-300">—</span>}</td>
-                      <td className="px-3 py-1.5 text-right font-bold text-gray-900 whitespace-nowrap">{totalQty(s)}</td>
-                      <td className="px-3 py-1.5 text-right text-gray-500 whitespace-nowrap">{s.branchCount}</td>
+
+          {/* 본문: 탭별 */}
+          <div className="p-3">
+            {statTab === 'branch' ? (
+              /* ── 지점별 확인 ── */
+              <div className="space-y-2.5">
+                <p className="text-xs text-gray-500">
+                  총{' '}
+                  <span className="font-bold text-gray-900">{branchStats.totalBranches}</span>개 지점 ·{' '}
+                  <span className="font-bold text-gray-900">{branchStats.totalAssignments}</span>건 배정
+                </p>
+
+                <ChipRow
+                  label="과목"
+                  items={branchStats.categories}
+                  activeValue={filter?.type === 'category' ? filter.value : null}
+                  onClick={value =>
+                    setFilter(
+                      filter?.type === 'category' && filter.value === value
+                        ? null
+                        : { type: 'category', value }
+                    )
+                  }
+                  colorClass="bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  activeColorClass="bg-blue-100 text-blue-700 ring-1 ring-blue-300"
+                />
+
+                <ChipRow
+                  label="구분"
+                  items={branchStats.operations}
+                  activeValue={filter?.type === 'operationType' ? filter.value : null}
+                  onClick={value =>
+                    setFilter(
+                      filter?.type === 'operationType' && filter.value === value
+                        ? null
+                        : { type: 'operationType', value }
+                    )
+                  }
+                  formatItem={operationTypeLabel}
+                  colorClass="bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  activeColorClass="bg-blue-100 text-blue-700 ring-1 ring-blue-300"
+                />
+
+                <ChipRow
+                  label="상태"
+                  items={branchStats.statuses}
+                  activeValue={filter?.type === 'status' ? filter.value : null}
+                  onClick={value =>
+                    setFilter(
+                      filter?.type === 'status' && filter.value === value
+                        ? null
+                        : { type: 'status', value: value as AssignmentStatus }
+                    )
+                  }
+                  formatItem={statusLabel}
+                  colorClass="bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  activeColorClass="bg-blue-100 text-blue-700 ring-1 ring-blue-300"
+                />
+              </div>
+            ) : (
+              /* ── 담당자별 확인 ── */
+              <div className="max-w-[720px]">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50/50">
+                    <tr>
+                      <SortableHeaderCell
+                        sortKey="name"
+                        current={statSort}
+                        onSort={setStatSort}
+                        align="left"
+                        color="text-gray-600"
+                      >
+                        담당자
+                      </SortableHeaderCell>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">
+                        역할별
+                      </th>
+                      <SortableHeaderCell
+                        sortKey="total"
+                        current={statSort}
+                        onSort={setStatSort}
+                        align="right"
+                        color="text-gray-700"
+                      >
+                        합계
+                      </SortableHeaderCell>
+                      <SortableHeaderCell
+                        sortKey="branchCount"
+                        current={statSort}
+                        onSort={setStatSort}
+                        align="right"
+                        color="text-gray-500"
+                      >
+                        지점
+                      </SortableHeaderCell>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {sortedSummary.map(([key, s]) => {
+                      const isSelected =
+                        filter?.type === 'writer' && filter.key === key;
+                      return (
+                        <tr
+                          key={key}
+                          onClick={() =>
+                            setFilter(
+                              isSelected
+                                ? null
+                                : { type: 'writer', key, label: s.name }
+                            )
+                          }
+                          className={`cursor-pointer ${
+                            isSelected
+                              ? 'bg-blue-50 hover:bg-blue-100'
+                              : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <td className="px-3 py-1.5 font-medium text-gray-900 whitespace-nowrap">
+                            {s.name}
+                          </td>
+                          <td className="px-3 py-1.5 whitespace-nowrap">
+                            <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                              {s.mainQty > 0 && (
+                                <span className="text-blue-600">사 {s.mainQty}</span>
+                              )}
+                              {s.subQty > 0 && (
+                                <span className="text-green-600">부 {s.subQty}</span>
+                              )}
+                              {s.optimalQty > 0 && (
+                                <span className="text-purple-600">최 {s.optimalQty}</span>
+                              )}
+                              {s.inblQty > 0 && (
+                                <span className="text-amber-600">인 {s.inblQty}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-1.5 text-right font-bold text-gray-900 whitespace-nowrap">
+                            {totalQty(s)}
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-gray-500 whitespace-nowrap">
+                            {s.branchCount}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -428,25 +753,42 @@ export default function AssignmentsPage() {
                 <th className="px-2 py-2.5 text-left font-semibold text-amber-600 w-36 whitespace-nowrap">인블</th>
                 <th className="px-2 py-2.5 text-center font-semibold text-gray-600 w-16">상태</th>
                 <th className="px-2 py-2.5 text-left font-semibold text-gray-600">비고</th>
-                {!isEditor && <th className="px-2 py-2.5 text-center font-semibold text-gray-600 w-8"></th>}
+                {!isEditor && (
+                  <th className="px-2 py-2.5 text-center font-semibold text-gray-600 w-8"></th>
+                )}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">로딩 중...</td></tr>
+                <tr>
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
+                    로딩 중...
+                  </td>
+                </tr>
               ) : filteredAssignments.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">배정 데이터가 없습니다.</td></tr>
+                <tr>
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
+                    배정 데이터가 없습니다.
+                  </td>
+                </tr>
               ) : (
-                filteredAssignments.map((a) => {
+                filteredAssignments.map(a => {
                   const main = getWriterDisplay(a.main_writer, a.main_writer_name, 'main');
                   const sub = getWriterDisplay(a.sub_writer, a.sub_writer_name, 'sub');
                   const opt = getWriterDisplay(a.optimal_writer, a.optimal_writer_name, 'optimal');
                   const inbl = getWriterDisplay(a.inbl_writer, a.inbl_writer_name, 'inbl');
 
-                  const renderWriterCell = (writerName: string, colorClass: string, writerId: string, role: string) => {
+                  const renderWriterCell = (
+                    writerName: string,
+                    colorClass: string,
+                    writerId: string,
+                    role: string
+                  ) => {
                     if (isEditor) {
                       return (
-                        <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${writerName ? colorClass : ''}`}>
+                        <span
+                          className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${writerName ? colorClass : ''}`}
+                        >
                           {writerName || '-'}
                         </span>
                       );
@@ -455,9 +797,11 @@ export default function AssignmentsPage() {
                       <InlineSelectCell
                         value={writerId}
                         options={writerOptions}
-                        onSave={(v) => updateWriter(a.id, role, v)}
+                        onSave={v => updateWriter(a.id, role, v)}
                         renderDisplay={(_, label) => (
-                          <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${writerName ? colorClass : ''}`}>
+                          <span
+                            className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${writerName ? colorClass : ''}`}
+                          >
                             {writerName || label}
                           </span>
                         )}
@@ -477,7 +821,7 @@ export default function AssignmentsPage() {
                             value={a.renewal_day}
                             type="number"
                             min={1}
-                            onSave={(v) => updateField(a.id, 'renewal_day', v)}
+                            onSave={v => updateField(a.id, 'renewal_day', v)}
                             displayClassName="text-gray-600"
                           />
                         )}
@@ -489,50 +833,84 @@ export default function AssignmentsPage() {
                         </span>
                       </td>
                       {/* 지점명 */}
-                      <td className="px-2 py-1.5 font-medium text-gray-900">
-                        {a.branch?.name}
-                      </td>
-                      {/* 사수 (이름+수량 통합) */}
+                      <td className="px-2 py-1.5 font-medium text-gray-900">{a.branch?.name}</td>
+                      {/* 사수 */}
                       <td className="px-2 py-1.5 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <div className="min-w-0 flex-1 truncate">
                             {renderWriterCell(main.writerName, main.colorClass, a.main_writer_id || '', 'main')}
                           </div>
                           <div className="text-blue-600 font-semibold text-right shrink-0 w-8">
-                            {isEditor ? <span>{a.main_quantity}</span> : <InlineEditCell value={a.main_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'main_quantity', v)} />}
+                            {isEditor ? (
+                              <span>{a.main_quantity}</span>
+                            ) : (
+                              <InlineEditCell
+                                value={a.main_quantity}
+                                type="number"
+                                min={0}
+                                onSave={v => updateField(a.id, 'main_quantity', v)}
+                              />
+                            )}
                           </div>
                         </div>
                       </td>
-                      {/* 부사수 (이름+수량 통합) */}
+                      {/* 부사수 */}
                       <td className="px-2 py-1.5 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <div className="min-w-0 flex-1 truncate">
                             {renderWriterCell(sub.writerName, sub.colorClass, a.sub_writer_id || '', 'sub')}
                           </div>
                           <div className="text-green-600 font-semibold text-right shrink-0 w-8">
-                            {isEditor ? <span>{a.sub_quantity}</span> : <InlineEditCell value={a.sub_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'sub_quantity', v)} />}
+                            {isEditor ? (
+                              <span>{a.sub_quantity}</span>
+                            ) : (
+                              <InlineEditCell
+                                value={a.sub_quantity}
+                                type="number"
+                                min={0}
+                                onSave={v => updateField(a.id, 'sub_quantity', v)}
+                              />
+                            )}
                           </div>
                         </div>
                       </td>
-                      {/* 최적배포 (이름+수량 통합) */}
+                      {/* 최적배포 */}
                       <td className="px-2 py-1.5 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <div className="min-w-0 flex-1 truncate">
                             {renderWriterCell(opt.writerName, opt.colorClass, a.optimal_writer_id || '', 'optimal')}
                           </div>
                           <div className="text-purple-600 font-semibold text-right shrink-0 w-8">
-                            {isEditor ? <span>{a.optimal_quantity}</span> : <InlineEditCell value={a.optimal_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'optimal_quantity', v)} />}
+                            {isEditor ? (
+                              <span>{a.optimal_quantity}</span>
+                            ) : (
+                              <InlineEditCell
+                                value={a.optimal_quantity}
+                                type="number"
+                                min={0}
+                                onSave={v => updateField(a.id, 'optimal_quantity', v)}
+                              />
+                            )}
                           </div>
                         </div>
                       </td>
-                      {/* 인블 (이름+수량 통합) */}
+                      {/* 인블 */}
                       <td className="px-2 py-1.5 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <div className="min-w-0 flex-1 truncate">
                             {renderWriterCell(inbl.writerName, inbl.colorClass, a.inbl_writer_id || '', 'inbl')}
                           </div>
                           <div className="text-amber-600 font-semibold text-right shrink-0 w-8">
-                            {isEditor ? <span>{a.inbl_quantity}</span> : <InlineEditCell value={a.inbl_quantity} type="number" min={0} onSave={(v) => updateField(a.id, 'inbl_quantity', v)} />}
+                            {isEditor ? (
+                              <span>{a.inbl_quantity}</span>
+                            ) : (
+                              <InlineEditCell
+                                value={a.inbl_quantity}
+                                type="number"
+                                min={0}
+                                onSave={v => updateField(a.id, 'inbl_quantity', v)}
+                              />
+                            )}
                           </div>
                         </div>
                       </td>
@@ -544,7 +922,7 @@ export default function AssignmentsPage() {
                           <InlineSelectCell
                             value={a.status}
                             options={STATUS_OPTIONS}
-                            onSave={(v) => updateField(a.id, 'status', v)}
+                            onSave={v => updateField(a.id, 'status', v)}
                             renderDisplay={() => <StatusBadge status={a.status as AssignmentStatus} />}
                           />
                         )}
@@ -556,7 +934,7 @@ export default function AssignmentsPage() {
                         ) : (
                           <InlineEditCell
                             value={a.note || ''}
-                            onSave={(v) => updateField(a.id, 'note', v)}
+                            onSave={v => updateField(a.id, 'note', v)}
                             placeholder="-"
                             displayClassName="text-gray-500 max-w-[150px] truncate"
                           />
@@ -585,7 +963,10 @@ export default function AssignmentsPage() {
       {/* 변경 이력 */}
       <div className="mt-4">
         <button
-          onClick={() => { setShowLogs(!showLogs); if (!showLogs) fetchLogs(); }}
+          onClick={() => {
+            setShowLogs(!showLogs);
+            if (!showLogs) fetchLogs();
+          }}
           className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700"
         >
           <History size={14} />
@@ -596,12 +977,16 @@ export default function AssignmentsPage() {
           <div className="mt-2 bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
               <h3 className="text-xs font-semibold text-gray-700">변경 이력 (최근 100건)</h3>
-              <button onClick={fetchLogs} className="text-xs text-blue-600 hover:underline">새로고침</button>
+              <button onClick={fetchLogs} className="text-xs text-blue-600 hover:underline">
+                새로고침
+              </button>
             </div>
             {logsLoading ? (
               <div className="px-4 py-6 text-center text-gray-400 text-xs">로딩 중...</div>
             ) : logs.length === 0 ? (
-              <div className="px-4 py-6 text-center text-gray-400 text-xs">변경 이력이 없습니다.</div>
+              <div className="px-4 py-6 text-center text-gray-400 text-xs">
+                변경 이력이 없습니다.
+              </div>
             ) : (
               <div className="max-h-[300px] overflow-y-auto">
                 <table className="w-full text-xs">
@@ -619,17 +1004,26 @@ export default function AssignmentsPage() {
                     {logs.map(log => (
                       <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                         <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap">
-                          {new Date(log.changed_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          {new Date(log.changed_at).toLocaleString('ko-KR', {
+                            month: 'numeric',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
                         </td>
                         <td className="px-3 py-1.5 font-medium text-gray-700">
                           {log.changed_by_profile?.name || '시스템'}
                         </td>
                         <td className="px-3 py-1.5">
-                          <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{log.field_changed}</span>
+                          <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">
+                            {log.field_changed}
+                          </span>
                         </td>
                         <td className="px-3 py-1.5 text-red-500">{log.old_value || '(없음)'}</td>
                         <td className="px-3 py-1.5 text-center text-gray-300">→</td>
-                        <td className="px-3 py-1.5 text-green-600 font-medium">{log.new_value || '(없음)'}</td>
+                        <td className="px-3 py-1.5 text-green-600 font-medium">
+                          {log.new_value || '(없음)'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -647,7 +1041,10 @@ export default function AssignmentsPage() {
           month={month}
           writers={writers}
           onClose={() => setModalOpen(false)}
-          onSave={() => { setModalOpen(false); fetchAssignments(); }}
+          onSave={() => {
+            setModalOpen(false);
+            fetchAssignments();
+          }}
         />
       )}
     </div>

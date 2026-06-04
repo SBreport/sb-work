@@ -83,45 +83,6 @@ function ChipRow({
   );
 }
 
-// ── SortableHeaderCell 인라인 컴포넌트 ──────────────────────
-
-type SortKey = 'name' | 'mainQty' | 'subQty' | 'optimalQty' | 'inblQty' | 'total' | 'branchCount';
-
-function SortableHeaderCell({
-  sortKey,
-  current,
-  onSort,
-  align,
-  color,
-  children,
-}: {
-  sortKey: SortKey;
-  current: { key: SortKey; dir: 'asc' | 'desc' };
-  onSort: (s: { key: SortKey; dir: 'asc' | 'desc' }) => void;
-  align: 'left' | 'right';
-  color: string;
-  children: React.ReactNode;
-}) {
-  const isActive = current.key === sortKey;
-  return (
-    <th
-      onClick={() =>
-        onSort(
-          isActive
-            ? { key: sortKey, dir: current.dir === 'asc' ? 'desc' : 'asc' }
-            : { key: sortKey, dir: sortKey === 'name' ? 'asc' : 'desc' }
-        )
-      }
-      className={`px-3 py-2 font-semibold ${color} text-${align} cursor-pointer hover:bg-gray-100 whitespace-nowrap select-none`}
-    >
-      {children}
-      {isActive && (
-        <span className="ml-1 text-[10px]">{current.dir === 'asc' ? '▲' : '▼'}</span>
-      )}
-    </th>
-  );
-}
-
 // ── 통합 필터 타입 ──────────────────────────────────────────
 
 type ActiveFilter =
@@ -150,11 +111,6 @@ export default function AssignmentsPage() {
   const [filter, setFilter] = useState<ActiveFilter | null>(null);
   // 집계 탭
   const [statTab, setStatTab] = useState<'branch' | 'writer'>('branch');
-  // 담당자별 탭 정렬
-  const [statSort, setStatSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({
-    key: 'total',
-    dir: 'desc',
-  });
 
   const fetchAssignments = useCallback(async () => {
     setLoading(true);
@@ -378,32 +334,6 @@ export default function AssignmentsPage() {
 
   // 담당자별 수량 집계 — pending 변경사항 반영된 displayAssignments 기준
   const writerSummary = useMemo(() => calcWriterStats(displayAssignments), [displayAssignments]);
-
-  // 정렬된 summary (담당자별 탭용)
-  const sortedSummary = useMemo(() => {
-    const entries = Object.entries(writerSummary);
-    const { key, dir } = statSort;
-    entries.sort(([, a], [, b]) => {
-      let av: number | string;
-      let bv: number | string;
-      if (key === 'total') {
-        av = totalQty(a);
-        bv = totalQty(b);
-      } else if (key === 'name') {
-        av = a.name;
-        bv = b.name;
-      } else {
-        av = a[key as keyof typeof a] as number;
-        bv = b[key as keyof typeof b] as number;
-      }
-      const cmp =
-        typeof av === 'string'
-          ? av.localeCompare(bv as string, 'ko')
-          : (av as number) - (bv as number);
-      return dir === 'asc' ? cmp : -cmp;
-    });
-    return entries;
-  }, [writerSummary, statSort]);
 
   // 지점별 집계
   const branchStats = useMemo(() => {
@@ -645,93 +575,45 @@ export default function AssignmentsPage() {
                 />
               </div>
             ) : (
-              /* ── 담당자별 확인 ── */
-              <div className="max-w-[720px]">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50/50">
-                    <tr>
-                      <SortableHeaderCell
-                        sortKey="name"
-                        current={statSort}
-                        onSort={setStatSort}
-                        align="left"
-                        color="text-gray-600"
-                      >
-                        담당자
-                      </SortableHeaderCell>
-                      <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">
-                        역할별
-                      </th>
-                      <SortableHeaderCell
-                        sortKey="total"
-                        current={statSort}
-                        onSort={setStatSort}
-                        align="right"
-                        color="text-gray-700"
-                      >
-                        합계
-                      </SortableHeaderCell>
-                      <SortableHeaderCell
-                        sortKey="branchCount"
-                        current={statSort}
-                        onSort={setStatSort}
-                        align="right"
-                        color="text-gray-500"
-                      >
-                        지점
-                      </SortableHeaderCell>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {sortedSummary.map(([key, s]) => {
-                      const isSelected =
-                        filter?.type === 'writer' && filter.key === key;
+              /* ── 담당자별 확인 (칩 묶음) ── */
+              <div>
+                <p className="text-xs text-gray-500 mb-2">
+                  담당자{' '}
+                  <span className="font-bold text-gray-900">{Object.keys(writerSummary).length}</span>명 ·
+                  합계{' '}
+                  <span className="font-bold text-gray-900">
+                    {Object.values(writerSummary).reduce((sum, s) => sum + totalQty(s), 0).toLocaleString()}
+                  </span>건
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(writerSummary)
+                    .sort(([, a], [, b]) => totalQty(b) - totalQty(a))
+                    .map(([key, s]) => {
+                      const isSelected = filter?.type === 'writer' && filter.key === key;
                       return (
-                        <tr
+                        <button
                           key={key}
                           onClick={() =>
-                            setFilter(
-                              isSelected
-                                ? null
-                                : { type: 'writer', key, label: s.name }
-                            )
+                            setFilter(isSelected ? null : { type: 'writer', key, label: s.name })
                           }
-                          className={`cursor-pointer ${
+                          className={`rounded-md px-2.5 py-1 text-xs transition-colors flex items-center gap-1.5 ${
                             isSelected
-                              ? 'bg-blue-50 hover:bg-blue-100'
-                              : 'hover:bg-gray-50'
+                              ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-400'
+                              : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200'
                           }`}
                         >
-                          <td className="px-3 py-1.5 font-medium text-gray-900 whitespace-nowrap">
-                            {s.name}
-                          </td>
-                          <td className="px-3 py-1.5 whitespace-nowrap">
-                            <div className="flex flex-wrap gap-x-2 gap-y-0.5">
-                              {s.mainQty > 0 && (
-                                <span className="text-blue-600">사 {s.mainQty}</span>
-                              )}
-                              {s.subQty > 0 && (
-                                <span className="text-green-600">부 {s.subQty}</span>
-                              )}
-                              {s.optimalQty > 0 && (
-                                <span className="text-purple-600">최 {s.optimalQty}</span>
-                              )}
-                              {s.inblQty > 0 && (
-                                <span className="text-amber-600">인 {s.inblQty}</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-3 py-1.5 text-right font-bold text-gray-900 whitespace-nowrap">
-                            {totalQty(s)}
-                          </td>
-                          <td className="px-3 py-1.5 text-right text-gray-500 whitespace-nowrap">
-                            {s.branchCount}
-                          </td>
-                        </tr>
+                          <span className="font-medium">{s.name}</span>
+                          <span className="font-bold">{totalQty(s)}</span>
+                          <span className="flex items-center gap-1 ml-0.5">
+                            {s.mainQty > 0 && <span className="text-blue-600 font-normal">사 {s.mainQty}</span>}
+                            {s.subQty > 0 && <span className="text-green-600 font-normal">부 {s.subQty}</span>}
+                            {s.optimalQty > 0 && <span className="text-purple-600 font-normal">최 {s.optimalQty}</span>}
+                            {s.inblQty > 0 && <span className="text-amber-600 font-normal">인 {s.inblQty}</span>}
+                          </span>
+                        </button>
                       );
                     })}
-                  </tbody>
-                </table>
+                </div>
               </div>
             )}
           </div>

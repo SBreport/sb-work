@@ -50,11 +50,23 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const supabase = createServerSupabase();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('sheet_import_config')
     .select('url, last_imported_month, last_imported_at')
     .eq('id', 1)
     .maybeSingle();
+
+  if (error) {
+    const hint = error.code === '42P01'
+      ? ' (sheet_import_config 테이블이 없습니다. migrations/20260522_sheet_import_config.sql을 Supabase에서 실행하세요.)'
+      : '';
+    return NextResponse.json({
+      url: null,
+      lastImportedMonth: null,
+      lastImportedAt: null,
+      error: `저장된 URL 조회 실패: ${error.message}${hint}`,
+    });
+  }
 
   return NextResponse.json({
     url: data?.url ?? null,
@@ -124,7 +136,7 @@ export async function POST(request: NextRequest) {
     }
 
     // sheet_import_config 갱신
-    await supabase.from('sheet_import_config').upsert({
+    const { error: cfgError } = await supabase.from('sheet_import_config').upsert({
       id: 1,
       url,
       last_imported_month: detected.month,
@@ -132,7 +144,11 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     });
 
-    return NextResponse.json({ success: true, ...result });
+    const warning = cfgError
+      ? `URL 저장 실패(다음번 자동 불러오기 안 됨): ${cfgError.message}${cfgError.code === '42P01' ? ' — migrations/20260522_sheet_import_config.sql을 Supabase에서 실행하세요.' : ''}`
+      : undefined;
+
+    return NextResponse.json({ success: true, ...result, ...(warning && { warning }) });
   }
 
   return NextResponse.json({ error: 'mode는 detect 또는 import여야 합니다.' }, { status: 400 });

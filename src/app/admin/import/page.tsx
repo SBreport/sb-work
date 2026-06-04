@@ -87,7 +87,8 @@ export default function ImportPage() {
   useEffect(() => {
     authFetch('/api/import-from-sheet')
       .then(r => r.json())
-      .then((data: { url: string | null; lastImportedMonth: string | null; lastImportedAt: string | null }) => {
+      .then((data: { url: string | null; lastImportedMonth: string | null; lastImportedAt: string | null; error?: string }) => {
+        if (data.error) setSheetError(data.error);
         if (data.url) setSheetUrl(data.url);
         setSavedLastImportedMonth(data.lastImportedMonth);
         setSavedLastImportedAt(data.lastImportedAt);
@@ -135,10 +136,13 @@ export default function ImportPage() {
         return;
       }
 
-      const result = importData as SheetImportResult & { success: boolean };
+      const result = importData as SheetImportResult & { success: boolean; warning?: string };
       setSavedLastImportedMonth(result.month);
       setSavedLastImportedAt(new Date().toISOString());
       setImportSummary({ type: 'sheet', result });
+      if (result.warning) {
+        setSheetError(result.warning);
+      }
     } catch (err) {
       setSheetError(err instanceof Error ? err.message : '알 수 없는 오류');
     } finally {

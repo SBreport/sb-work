@@ -36,6 +36,9 @@ yarn-error.log*
 # claude
 .claude/
 
+# 세션 메타(로드맵·이력) — 개인 작업 컨텍스트
+_세션/
+
 # seed data (개인정보 포함)
 /seed/
 

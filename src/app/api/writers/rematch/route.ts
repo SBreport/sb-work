@@ -34,8 +34,8 @@ export async function POST(request: NextRequest) {
   // 2. *_writer_id가 null인 assignments 조회
   const { data: assigns, error: aErr } = await supabase
     .from('assignments')
-    .select('id, main_writer_id, main_writer_name, sub_writer_id, sub_writer_name, optimal_writer_id, optimal_writer_name, inbl_writer_id, inbl_writer_name')
-    .or('main_writer_id.is.null,sub_writer_id.is.null,optimal_writer_id.is.null,inbl_writer_id.is.null');
+    .select('id, main_writer_id, main_writer_name, sub_writer_id, sub_writer_name, optimal_writer_id, optimal_writer_name, inbl_writer_id, inbl_writer_name, clinical_writer_id, clinical_writer_name')
+    .or('main_writer_id.is.null,sub_writer_id.is.null,optimal_writer_id.is.null,inbl_writer_id.is.null,clinical_writer_id.is.null');
 
   if (aErr) {
     return NextResponse.json({ error: aErr.message }, { status: 500 });
@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
     tryMatch('main_writer_id', 'main_writer_name', a.main_writer_id, a.main_writer_name);
     tryMatch('sub_writer_id', 'sub_writer_name', a.sub_writer_id, a.sub_writer_name);
     tryMatch('optimal_writer_id', 'optimal_writer_name', a.optimal_writer_id, a.optimal_writer_name);
+    tryMatch('clinical_writer_id', 'clinical_writer_name', a.clinical_writer_id, a.clinical_writer_name);
     tryMatch('inbl_writer_id', 'inbl_writer_name', a.inbl_writer_id, a.inbl_writer_name);
 
     if (Object.keys(updates).length > 0) {

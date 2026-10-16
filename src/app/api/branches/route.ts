@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   const assignmentsPromise = canSeeAssignments
     ? supabase
         .from('assignments')
-        .select('id, branch_id, main_writer_name, main_quantity, sub_writer_name, sub_quantity, optimal_writer_name, optimal_quantity, inbl_writer_name, inbl_quantity, renewal_day, status, note, product_type, operation_type, partner_id, slot, partner:partners(id, name, partner_type, kakao_id, kakao_link)')
+        .select('package_name, information_quantity, clinical_writer_id, clinical_writer_name, clinical_quantity, id, branch_id, main_writer_name, main_quantity, sub_writer_name, sub_quantity, optimal_writer_name, optimal_quantity, inbl_writer_name, inbl_quantity, renewal_day, status, note, product_type, operation_type, partner_id, slot, partner:partners(id, name, partner_type, kakao_id, kakao_link)')
         .eq('month', month)
         .order('slot', { ascending: true })
     : Promise.resolve({ data: [], error: null });

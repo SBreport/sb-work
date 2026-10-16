@@ -1,7 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * CSV 컬럼 구조 (2026-04 새 양식, v2):
+ * 2026-11 양식(v3): 고유 헤더로 담당자 블록을 찾고 블록 내 수량/비고를 읽는다.
+ * N 정보성+수량 / N 임상/논문+수량 / 비고 / 블로그 총 수량 /
+ * SEO 컨텐츠+비고+수량 / 최적배포+수량 / 인블 / 구분 / 연결 / 진행여부 / 패키지
+ *
+ * CSV 컬럼 구조 (2026-04 양식, v2):
  * A: 갱신월 / B: 갱신일 / C: 과목/병원명 / D: 지점명
  * E: 사수 / F: 사수 비고 / G: 사수 수량
  * H: 부사수 / I: 부사수 비고 / J: 부사수 수량
@@ -36,6 +40,11 @@ export interface ParsedRow {
   operationType: string;    // 구분
   connectionName: string;   // 연결 (수강생/대행사 원본 이름)
   progressStatus: string;   // 진행여부
+  format: 'v1' | 'v2' | 'v3';
+  packageName: string;
+  clinicalWriter: string;
+  informationQuantity: number | null;
+  clinicalQuantity: number | null;
 }
 
 export interface ImportResult {
@@ -162,11 +171,12 @@ export function parseCSV(text: string): string[][] {
 }
 
 /**
- * 헤더를 보고 새 양식(v2)인지 구 양식(v1)인지 판별
+ * 유형별 배정(v3), 구분 열이 있는 양식(v2), 기존 양식(v1)을 판별
  * - v2: 헤더에 "구분" 있음 (N열 근처)
  */
-export function detectFormat(headerRow: string[]): 'v1' | 'v2' {
+export function detectFormat(headerRow: string[]): 'v1' | 'v2' | 'v3' {
   const headers = headerRow.map(h => cleanStr(h));
+  if (headers.includes('N 정보성') || headers.includes('N 임상/논문')) return 'v3';
   if (headers.some(h => h === '구분')) return 'v2';
   return 'v1';
 }
@@ -177,6 +187,29 @@ export function parseCSVRows(csvText: string): ParsedRow[] {
 
   const parsed: ParsedRow[] = [];
   const format = detectFormat(allRows[0]);
+  const headers = allRows[0].map(cleanStr);
+  const column = (name: string) => {
+    const i = headers.indexOf(name);
+    if (i < 0) throw new Error(`새 양식에 '${name}' 열이 없습니다.`);
+    return i;
+  };
+  const infoCol = format === 'v3' ? column('N 정보성') : -1;
+  const clinicalCol = format === 'v3' ? column('N 임상/논문') : -1;
+  const totalCol = format === 'v3' ? column('블로그 총 수량') : -1;
+  const seoCol = format === 'v3' ? column('SEO 컨텐츠') : -1;
+  const optimalCol = format === 'v3' ? column('최적배포') : -1;
+  if (format === 'v3') {
+    for (const name of ['인블', '구분', '연결', '진행여부', '패키지']) column(name);
+    for (const i of [infoCol, clinicalCol, seoCol + 1, optimalCol]) {
+      if (headers[i + 1] !== '수량') throw new Error(`'${headers[i]}' 다음 수량 열을 확인해주세요.`);
+    }
+  }
+  const quantity = (value: string | undefined, row: number): number | null => {
+    if (!cleanStr(value)) return null;
+    const n = Number(cleanStr(value).replace(/,/g, ''));
+    if (!Number.isSafeInteger(n) || n < 0) throw new Error(`${row}행: 수량은 0 이상의 정수여야 합니다.`);
+    return n;
+  };
 
   for (let i = 1; i < allRows.length; i++) {
     const cols = allRows[i];
@@ -196,7 +229,12 @@ export function parseCSVRows(csvText: string): ParsedRow[] {
     let progressStatus = '';
     let optimalNote = '';
 
-    if (format === 'v2') {
+    if (format === 'v3') {
+      inblQuantity = quantity(cols[column('인블')], i + 1) ?? 0;
+      operationType = parseOperationType(cols[column('구분')] || '');
+      connectionName = cleanStr(cols[column('연결')]);
+      progressStatus = cleanStr(cols[column('진행여부')]);
+    } else if (format === 'v2') {
       // K(10)=최적배포, L(11)=수량, M(12)=인블, N(13)=구분, O(14)=연결, P(15)=진행여부
       inblQuantity = cleanNum(cols[12]);
       operationType = parseOperationType(cols[13] || '');
@@ -212,6 +250,26 @@ export function parseCSVRows(csvText: string): ParsedRow[] {
     // D열에서 분리된 수강생 이름이 있으면 연결로 사용 (O열이 비어있을 때)
     const finalConnection = connectionName || (partnerFromName ? `${partnerFromName} (수강생)` : '');
 
+    const mainWriter = cleanStr(cols[format === 'v3' ? infoCol : 4]);
+    const packageName = cleanStr(cols[format === 'v3' ? column('패키지') : 16]);
+    const clinicalWriter = format === 'v3' ? cleanStr(cols[clinicalCol]) : '';
+    const informationQuantity = format === 'v3' ? quantity(cols[infoCol + 1], i + 1) : null;
+    const clinicalQuantity = format === 'v3' ? quantity(cols[clinicalCol + 1], i + 1) : null;
+    const mainQuantity = format === 'v3' ? quantity(cols[totalCol], i + 1) : cleanNum(cols[6]);
+    if (format === 'v3' && packageName === '브랜딩') {
+      if (mainQuantity == null) throw new Error(`${i + 1}행 ${branchName}: 블로그 총 수량이 필요합니다.`);
+      const unsplit = informationQuantity == null && clinicalQuantity == null;
+      if (unsplit && (mainQuantity > 0 && (!mainWriter || mainWriter !== clinicalWriter))) {
+        throw new Error(`${i + 1}행 ${branchName}: 유형별 수량이 없으면 두 담당자가 같아야 합니다.`);
+      }
+      if (!unsplit) {
+        if (informationQuantity == null || clinicalQuantity == null || informationQuantity + clinicalQuantity !== mainQuantity) {
+          throw new Error(`${i + 1}행 ${branchName}: 정보형 + 임상/논문형 수량이 블로그 총 수량과 일치해야 합니다.`);
+        }
+        // 담당자 미정은 허용하며, 이름이 없는 수량을 다른 담당자에게 넘기지 않는다.
+      }
+    }
+
     parsed.push({
       renewalMonth,
       renewalDay: parseRenewalDay(cols[1]),
@@ -219,19 +277,20 @@ export function parseCSVRows(csvText: string): ParsedRow[] {
       productType: tag.productType,
       branchName,
       partnerName: partnerFromName,
-      mainWriter: cleanStr(cols[4]),
-      mainNote: cleanStr(cols[5]),
-      mainQuantity: cleanNum(cols[6]),
-      subWriter: cleanStr(cols[7]),
-      subNote: cleanStr(cols[8]),
-      subQuantity: cleanNum(cols[9]),
-      optimalWriter: cleanStr(cols[10]),
-      optimalQuantity: cleanNum(cols[11]),
+      mainWriter,
+      mainNote: cleanStr(cols[format === 'v3' ? totalCol - 1 : 5]),
+      mainQuantity: mainQuantity ?? 0,
+      subWriter: cleanStr(cols[format === 'v3' ? seoCol : 7]),
+      subNote: cleanStr(cols[format === 'v3' ? seoCol + 1 : 8]),
+      subQuantity: format === 'v3' ? quantity(cols[seoCol + 2], i + 1) ?? 0 : cleanNum(cols[9]),
+      optimalWriter: cleanStr(cols[format === 'v3' ? optimalCol : 10]),
+      optimalQuantity: format === 'v3' ? quantity(cols[optimalCol + 1], i + 1) ?? 0 : cleanNum(cols[11]),
       optimalNote,
       inblQuantity,
       operationType,
       connectionName: finalConnection,
       progressStatus,
+      format, packageName, clinicalWriter, informationQuantity, clinicalQuantity,
     });
   }
 
@@ -258,7 +317,27 @@ export async function importCsvForMonth(
     throw new Error('데이터가 없습니다. CSV 파일을 확인해주세요.');
   }
 
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('올바른 대상 월이 필요합니다.');
+  if (rows.some(r => r.format === 'v3') && month < '2026-11') throw new Error('새 양식은 2026년 11월부터 사용할 수 있습니다.');
+  for (const row of rows) {
+    const m = row.renewalMonth.match(/^(?:(\d{4})-)?(\d{1,2})(?:월)?$/);
+    if (!m || Number(m[2]) !== Number(month.slice(5)) || (m[1] && m[1] !== month.slice(0, 4))) {
+      throw new Error('시트의 갱신월과 대상 월이 일치하지 않습니다.');
+    }
+  }
+  const hasNewFormat = rows.some(r => r.format === 'v3');
+  if (hasNewFormat) {
+    const { error } = await supabase.from('assignments')
+      .select('package_name, information_quantity, clinical_writer_id, clinical_writer_name, clinical_quantity').limit(0);
+    if (error) throw new Error('새 배정 양식용 DB 마이그레이션을 먼저 적용해주세요. 기존 배정은 변경하지 않았습니다.');
+  }
   const writerNames = new Set<string>();
+  for (const row of rows) {
+    for (const name of [row.mainWriter, row.subWriter, row.optimalWriter,
+      ...(row.packageName === '브랜딩' ? [row.clinicalWriter] : [])]) {
+      if (name) writerNames.add(name);
+    }
+  }
 
   // 1. 지점 등록 (지점명 기준 unique, (숫자)는 이미 normalize됨)
   const branchIdMap = new Map<string, string>();
@@ -266,10 +345,6 @@ export async function importCsvForMonth(
   for (const row of rows) {
     const branchKey = row.branchName;
     if (branchIdMap.has(branchKey)) continue;
-
-    if (row.mainWriter) writerNames.add(row.mainWriter);
-    if (row.subWriter) writerNames.add(row.subWriter);
-    if (row.optimalWriter) writerNames.add(row.optimalWriter);
 
     const { data: existing } = await supabase
       .from('branches')
@@ -337,8 +412,7 @@ export async function importCsvForMonth(
     }
   }
 
-  // 4. 해당 월 기존 배정 삭제 후 새로 입력
-  await supabase.from('assignments').delete().eq('month', month);
+  // 4. 저장할 배정을 모두 구성한 뒤 월 단위로 교체한다.
 
   // 5. slot 할당: 같은 branch_id + month가 반복되면 slot 증가
   const slotCounter = new Map<string, number>();
@@ -346,7 +420,7 @@ export async function importCsvForMonth(
 
   for (const row of rows) {
     const branchId = branchIdMap.get(row.branchName);
-    if (!branchId) continue;
+    if (!branchId) throw new Error(`${row.branchName}: 지점 저장에 실패했습니다.`);
 
     const slotKey = `${branchId}::${month}`;
     const currentSlot = (slotCounter.get(slotKey) || 0) + 1;
@@ -355,6 +429,13 @@ export async function importCsvForMonth(
     const partnerId = row.connectionName ? (partnerIdMap.get(row.connectionName) || null) : null;
 
     assignments.push({
+      ...(hasNewFormat ? {
+        package_name: row.packageName || null,
+        information_quantity: row.packageName === '브랜딩' ? row.informationQuantity : null,
+        clinical_writer_id: row.packageName === '브랜딩' ? writerIdMap.get(row.clinicalWriter) || null : null,
+        clinical_writer_name: row.packageName === '브랜딩' ? row.clinicalWriter || null : null,
+        clinical_quantity: row.packageName === '브랜딩' ? row.clinicalQuantity : null,
+      } : {}),
       branch_id: branchId,
       month,
       slot: currentSlot,
@@ -382,10 +463,15 @@ export async function importCsvForMonth(
     });
   }
 
-  for (let i = 0; i < assignments.length; i += 50) {
-    const { error: insertError } = await supabase.from('assignments').insert(assignments.slice(i, i + 50));
-    if (insertError) {
-      throw new Error(`배정 저장 실패 (${i + 1}~${Math.min(i + 50, assignments.length)}행): ${insertError.message}`);
+  if (hasNewFormat) {
+    const { error } = await supabase.rpc('replace_month_assignments', { target_month: month, new_assignments: assignments });
+    if (error) throw new Error(`배정 저장 실패: ${error.message}`);
+  } else {
+    const { error: deleteError } = await supabase.from('assignments').delete().eq('month', month);
+    if (deleteError) throw new Error(`기존 배정 삭제 실패: ${deleteError.message}`);
+    for (let i = 0; i < assignments.length; i += 50) {
+      const { error } = await supabase.from('assignments').insert(assignments.slice(i, i + 50));
+      if (error) throw new Error(`배정 저장 실패: ${error.message}`);
     }
   }
 

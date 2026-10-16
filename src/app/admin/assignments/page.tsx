@@ -14,6 +14,7 @@ import type { Assignment, User, AssignmentStatus } from '@/types/database';
 import { Plus, Copy, Download, Trash2, History, X } from 'lucide-react';
 import { STATUS_OPTIONS, ASSIGNMENT_STATUS_MAP } from '@/lib/constants';
 import { calcWriterStats, totalQty } from '@/lib/stats';
+import { isBranding } from '@/lib/blog-assignment';
 
 interface LogEntry {
   id: string;
@@ -214,7 +215,7 @@ export default function AssignmentsPage() {
               updates: dbFields,
               changed_by: user?.id,
             }),
-          });
+          }).then(async response => { if (!response.ok) throw new Error((await response.json()).error || '저장 실패'); });
         })
       );
       setPendingChanges({});
@@ -295,7 +296,7 @@ export default function AssignmentsPage() {
       '인블',
       '인블수량',
       '상태',
-      '비고',
+      '비고', '패키지', '정보형 수량', '임상/논문형 담당자', '임상/논문형 수량',
     ];
     const rows = assignments.map(a => [
       `${a.renewal_day}일`,
@@ -311,7 +312,7 @@ export default function AssignmentsPage() {
       a.inbl_writer?.name || a.inbl_writer_name || '',
       a.inbl_quantity,
       STATUS_OPTIONS.find(s => s.value === a.status)?.label || a.status,
-      a.note || '',
+      a.note || '', a.package_name || '', a.information_quantity ?? '', a.clinical_writer_name || '', a.clinical_quantity ?? '',
     ]);
 
     const bom = '﻿';
@@ -375,12 +376,14 @@ export default function AssignmentsPage() {
               a.sub_writer_name,
               a.optimal_writer_name,
               a.inbl_writer_name,
+              a.clinical_writer_name,
             ].includes(target);
           return [
             a.main_writer_id,
             a.sub_writer_id,
             a.optimal_writer_id,
             a.inbl_writer_id,
+            a.clinical_writer_id,
           ].includes(target);
         }
         case 'category':
@@ -715,10 +718,20 @@ export default function AssignmentsPage() {
                         </span>
                       </td>
                       {/* 지점명 */}
-                      <td className="px-2 py-1.5 font-medium text-gray-900">{a.branch?.name}</td>
+                      <td className="px-2 py-1.5 font-medium text-gray-900">{a.branch?.name}{isBranding(a) && <span className="ml-1 text-xs text-blue-600">브랜딩</span>}</td>
                       {/* 사수 */}
                       <td className="px-2 py-1.5 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
+                        {isBranding(a) ? (
+                          <div className="text-xs space-y-1">
+                            {a.information_quantity == null && a.clinical_quantity == null ? (
+                              <p>{main.writerName || '미배정'} · 블로그 {a.main_quantity}건 (유형 미구분)</p>
+                            ) : <>
+                              <p>정보형 {main.writerName || '미배정'} {a.information_quantity ?? 0}건</p>
+                              <p>임상/논문형 {a.clinical_writer_name || '미배정'} {a.clinical_quantity ?? 0}건</p>
+                              <p className="text-gray-400">블로그 총 {a.main_quantity}건 · 시트에서 수정</p>
+                            </>}
+                          </div>
+                        ) : <div className="flex items-center gap-2">
                           <div className="min-w-0 flex-1 truncate">
                             {renderWriterCell(main.writerName, main.colorClass, a.main_writer_id || '', 'main')}
                           </div>
@@ -734,7 +747,7 @@ export default function AssignmentsPage() {
                               />
                             )}
                           </div>
-                        </div>
+                        </div>}
                       </td>
                       {/* 부사수 */}
                       <td className="px-2 py-1.5 whitespace-nowrap">

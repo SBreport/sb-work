@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:branding": "node scripts/check-branding.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.0",

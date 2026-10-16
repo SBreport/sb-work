@@ -89,6 +89,13 @@ export interface Assignment {
   inbl_quantity: number;
   inbl_note: string | null;
 
+  // 2026-11 새 시트: main_quantity는 블로그 총량, main_writer는 정보형/공통 담당자.
+  package_name?: string | null;
+  information_quantity?: number | null;
+  clinical_writer_id?: string | null;
+  clinical_writer_name?: string | null;
+  clinical_quantity?: number | null;
+
   status: AssignmentStatus;
   note: string | null;
   product_type: string | null;

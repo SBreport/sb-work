@@ -15,6 +15,7 @@ import type { Assignment, AssignmentStatus } from '@/types/database';
 import { AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { calcWriterStats, totalQty } from '@/lib/stats';
 import { ASSIGNMENT_STATUS_MAP } from '@/lib/constants';
+import { isBranding } from '@/lib/blog-assignment';
 
 export default function DashboardView() {
   const [month, setMonth] = useState(getCurrentMonth());
@@ -27,6 +28,7 @@ export default function DashboardView() {
     const prevMonth = getAdjacentMonth(month, -1);
 
     const selectQuery = `id, month, status, renewal_day,
+      package_name, information_quantity, clinical_writer_id, clinical_writer_name, clinical_quantity,
       main_writer_id, main_writer_name, main_quantity,
       sub_writer_id, sub_writer_name, sub_quantity,
       optimal_writer_id, optimal_writer_name, optimal_quantity,
@@ -77,6 +79,8 @@ export default function DashboardView() {
     });
     return { totalPosts: total, prevTotalPosts: prevTotal, postsDiff: total - prevTotal, statusCounts: counts, unassigned: unas, sortedWriters: sorted };
   }, [assignments, prevAssignments, stats]);
+
+  const hasBranding = assignments.some(isBranding);
 
   return (
     <div className="p-4 max-w-[1200px]">
@@ -165,8 +169,8 @@ export default function DashboardView() {
                 <thead>
                   <tr className="border-b border-gray-200 text-xs">
                     <th className="px-4 py-2.5 text-left font-semibold text-gray-600 w-24">담당자</th>
-                    <th className="px-3 py-2.5 text-center font-semibold text-blue-600 w-16">사수</th>
-                    <th className="px-3 py-2.5 text-center font-semibold text-green-600 w-16">부사수</th>
+                    <th className="px-3 py-2.5 text-center font-semibold text-blue-600 w-16">{hasBranding ? '블로그/사수' : '사수'}</th>
+                    <th className="px-3 py-2.5 text-center font-semibold text-green-600 w-16">{hasBranding ? 'SEO/부사수' : '부사수'}</th>
                     <th className="px-3 py-2.5 text-center font-semibold text-purple-600 w-16">최적</th>
                     <th className="px-3 py-2.5 text-center font-semibold text-amber-600 w-16">인블</th>
                     <th className="px-3 py-2.5 text-center font-bold text-gray-900 w-16">합계</th>

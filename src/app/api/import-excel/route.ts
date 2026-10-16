@@ -17,7 +17,11 @@ export async function POST(request: NextRequest) {
   }
 
   const text = await file.text();
-  const rows = parseCSVRows(text);
+  let rows;
+  try { rows = parseCSVRows(text); }
+  catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : '시트 형식을 확인해주세요.' }, { status: 400 });
+  }
 
   if (rows.length === 0) {
     return NextResponse.json({ error: '데이터가 없습니다. CSV 파일을 확인해주세요.' }, { status: 400 });
@@ -28,6 +32,7 @@ export async function POST(request: NextRequest) {
       ...rows.map(r => r.mainWriter).filter(Boolean),
       ...rows.map(r => r.subWriter).filter(Boolean),
       ...rows.map(r => r.optimalWriter).filter(Boolean),
+      ...rows.filter(r => r.packageName === '브랜딩').map(r => r.clinicalWriter).filter(Boolean),
     ])];
 
     return NextResponse.json({
@@ -46,6 +51,10 @@ export async function POST(request: NextRequest) {
         connection: r.connectionName,
         mainWriter: r.mainWriter,
         mainQuantity: r.mainQuantity,
+        packageName: r.packageName,
+        informationQuantity: r.informationQuantity,
+        clinicalWriter: r.clinicalWriter,
+        clinicalQuantity: r.clinicalQuantity,
         subWriter: r.subWriter,
         subQuantity: r.subQuantity,
         optimalWriter: r.optimalWriter,

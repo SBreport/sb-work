@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
+import { assignmentWriterFilter } from '@/lib/blog-assignment';
 
 export default function Home() {
   const { user, profile, loading } = useAuth();
@@ -37,7 +38,7 @@ export default function Home() {
       supabase
         .from('assignments')
         .select('id')
-        .or(`main_writer_id.eq.${profile.id},sub_writer_id.eq.${profile.id},optimal_writer_id.eq.${profile.id},inbl_writer_id.eq.${profile.id}`)
+        .or(assignmentWriterFilter(profile.id))
         .limit(1)
         .then(({ data }) => router.push((data?.length ?? 0) > 0 ? '/my' : '/notices'));
     } else {

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
+import { assignmentWriterFilter } from '@/lib/blog-assignment';
 import {
   LayoutDashboard,
   ClipboardList,
@@ -127,7 +128,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
     supabase
       .from('assignments')
       .select('id')
-      .or(`main_writer_id.eq.${checkId},sub_writer_id.eq.${checkId},optimal_writer_id.eq.${checkId},inbl_writer_id.eq.${checkId}`)
+      .or(assignmentWriterFilter(checkId))
       .limit(1)
       .then(({ data }) => setEmployeeHasWork((data?.length ?? 0) > 0));
   }, [isEmployee, profile?.id, isViewingAs, viewAsRole, viewAsId]);
@@ -142,7 +143,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
       const { data } = await supabase
         .from('assignments')
         .select('id')
-        .or(`main_writer_id.eq.${id},sub_writer_id.eq.${id},optimal_writer_id.eq.${id},inbl_writer_id.eq.${id}`)
+        .or(assignmentWriterFilter(id))
         .limit(1);
       router.push((data?.length ?? 0) > 0 ? '/my' : '/notices');
     } else {

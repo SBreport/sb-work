@@ -121,6 +121,8 @@ export async function DELETE(request: NextRequest) {
   await supabase.from('assignments').update({ optimal_writer_id: null }).eq('optimal_writer_id', id);
   await supabase.from('assignments').update({ inbl_writer_id: null }).eq('inbl_writer_id', id);
 
+  await supabase.from('assignments').update({ clinical_writer_id: null }).eq('clinical_writer_id', id);
+
   // profiles 삭제 (auth.users는 cascade로 같이 삭제)
   const { error } = await supabase.auth.admin.deleteUser(id);
   if (error) {

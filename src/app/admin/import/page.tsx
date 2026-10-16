@@ -118,17 +118,17 @@ export default function ImportPage() {
         return;
       }
 
-      const { monthLabel: label } = detectData as { month: string; monthLabel: string };
+      const { month: detectedMonth, monthLabel: label, sheetName } = detectData as { month: string; monthLabel: string; sheetName: string };
 
       // 2) confirm
-      const ok = confirm(`'${label}' 데이터로 인식했습니다. 갱신하시겠습니까?`);
+      const ok = confirm(`시트 '${sheetName}'의 ${label} 데이터를 갱신합니다. 계속하시겠습니까?`);
       if (!ok) return;
 
       // 3) import
       const importRes = await authFetch('/api/import-from-sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: sheetUrl.trim(), mode: 'import' }),
+        body: JSON.stringify({ url: sheetUrl.trim(), mode: 'import', expectedMonth: detectedMonth }),
       });
       const importData = await importRes.json();
       if (!importRes.ok) {

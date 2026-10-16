@@ -1,48 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase-server';
 import { requireAdminOnly } from '@/lib/auth-guard';
-import { importCsvForMonth, parseCSV, cleanStr } from '@/lib/csv-import';
-
-/** URL에서 spreadsheet ID + gid 추출 후 CSV export URL 반환 */
-function buildCsvExportUrl(rawUrl: string): string | null {
-  // 최소 유효성: docs.google.com/spreadsheets/d/<ID> 패턴
-  const idMatch = rawUrl.match(/docs\.google\.com\/spreadsheets\/d\/([^/\s?#]+)/);
-  if (!idMatch) return null;
-
-  const id = idMatch[1];
-  const gidMatch = rawUrl.match(/[?&]gid=(\d+)/);
-  const gid = gidMatch ? gidMatch[1] : null;
-
-  let url = `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`;
-  if (gid) url += `&gid=${gid}`;
-  return url;
-}
-
-/** CSV 첫 데이터 행 A열에서 "N월" 숫자 + 연도로 YYYY-MM 추출 */
-function detectMonthFromCsv(csvText: string): { month: string; monthLabel: string } | null {
-  const rows = parseCSV(csvText);
-  // 헤더(index 0) 다음부터 A열이 비어있지 않은 첫 행을 찾는다
-  for (let i = 1; i < rows.length; i++) {
-    const cell = cleanStr(rows[i][0]);
-    if (!cell) continue;
-    // "6월", "06월", "2026-06" 등 여러 형식 지원
-    const monthNumMatch = cell.match(/^(\d{1,2})월$/);
-    if (monthNumMatch) {
-      const m = Number(monthNumMatch[1]);
-      const year = new Date().getFullYear();
-      const month = `${year}-${String(m).padStart(2, '0')}`;
-      return { month, monthLabel: `${m}월` };
-    }
-    // "YYYY-MM" 형식
-    const fullMatch = cell.match(/^(\d{4})-(\d{1,2})$/);
-    if (fullMatch) {
-      const m = Number(fullMatch[2]);
-      const month = `${fullMatch[1]}-${String(m).padStart(2, '0')}`;
-      return { month, monthLabel: `${m}월` };
-    }
-  }
-  return null;
-}
+import { importCsvForMonth } from '@/lib/csv-import';
+import { buildCsvExportUrl, detectSheetPeriod } from '@/lib/sheet-period';
 
 /** GET: 저장된 시트 설정 반환 */
 export async function GET(request: NextRequest) {
@@ -80,48 +40,51 @@ export async function POST(request: NextRequest) {
   const auth = await requireAdminOnly(request);
   if (auth instanceof NextResponse) return auth;
 
-  const body = await request.json() as { url?: string; mode?: string };
+  const body = await request.json() as { url?: string; mode?: string; expectedMonth?: string };
   const { url, mode } = body;
 
   if (!url || typeof url !== 'string') {
     return NextResponse.json({ error: 'URL이 없습니다.' }, { status: 400 });
   }
 
-  const exportUrl = buildCsvExportUrl(url);
-  if (!exportUrl) {
-    return NextResponse.json(
-      { error: '올바른 구글 시트 URL이 아닙니다. (docs.google.com/spreadsheets/d/... 형식)' },
-      { status: 400 },
-    );
+  if (mode !== 'detect' && mode !== 'import') {
+    return NextResponse.json({ error: 'mode는 detect 또는 import여야 합니다.' }, { status: 400 });
+  }
+  let exportUrl: string;
+  try { exportUrl = buildCsvExportUrl(url); }
+  catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : '시트 링크를 확인해주세요.' }, { status: 400 });
   }
 
   // CSV fetch
   let csvText: string;
+  let disposition: string | null;
   try {
-    const fetchRes = await fetch(exportUrl);
+    const fetchRes = await fetch(exportUrl, { cache: 'no-store' });
     if (!fetchRes.ok) {
       return NextResponse.json(
         { error: `구글 시트를 가져오지 못했습니다. (HTTP ${fetchRes.status}) 시트가 "링크 있는 사용자 - 뷰어" 권한인지 확인하세요.` },
         { status: 502 },
       );
     }
+    disposition = fetchRes.headers.get('content-disposition');
     csvText = await fetchRes.text();
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: `네트워크 오류: ${msg}` }, { status: 502 });
   }
 
-  // 월 감지
-  const detected = detectMonthFromCsv(csvText);
-  if (!detected) {
-    return NextResponse.json(
-      { error: 'CSV 첫 데이터 행에서 월(예: "6월")을 인식할 수 없습니다.' },
-      { status: 400 },
-    );
+  let detected: ReturnType<typeof detectSheetPeriod>;
+  try { detected = detectSheetPeriod(csvText, disposition); }
+  catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : '시트의 연월을 확인하지 못했습니다.' }, { status: 400 });
   }
 
   if (mode === 'detect') {
-    return NextResponse.json({ month: detected.month, monthLabel: detected.monthLabel });
+    return NextResponse.json(detected);
+  }
+  if (body.expectedMonth !== detected.month) {
+    return NextResponse.json({ error: '확인한 연월과 현재 시트의 연월이 다릅니다. 페이지를 새로고침한 뒤 다시 갱신해주세요.' }, { status: 409 });
   }
 
   if (mode === 'import') {

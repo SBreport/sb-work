@@ -7,19 +7,43 @@ import ts from 'typescript';
 
 const dir = mkdtempSync(join(tmpdir(), 'sb-branding-'));
 try {
-  for (const name of ['csv-import', 'blog-assignment', 'stats']) {
+  for (const name of ['csv-import', 'blog-assignment', 'stats', 'sheet-period']) {
     const source = readFileSync(new URL(`../src/lib/${name}.ts`, import.meta.url), 'utf8');
-    writeFileSync(join(dir, `${name}.cjs`), ts.transpileModule(source.replaceAll("'./blog-assignment'", "'./blog-assignment.cjs'"), {
+    writeFileSync(join(dir, `${name}.cjs`), ts.transpileModule(source.replaceAll("'./blog-assignment'", "'./blog-assignment.cjs'").replaceAll("'./csv-import'", "'./csv-import.cjs'"), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
     }).outputText);
   }
   const require = createRequire(import.meta.url);
+  const { buildCsvExportUrl, detectSheetPeriod } = require(join(dir, 'sheet-period.cjs'));
   const { parseCSVRows, importCsvForMonth } = require(join(dir, 'csv-import.cjs'));
   const { workRolesFor, summarizeWork, isBranding, assignmentWriterFilter } = require(join(dir, 'blog-assignment.cjs'));
   const { calcWriterStats, totalQty } = require(join(dir, 'stats.cjs'));
   const header = ['갱신월','갱신일','과목/병원명','지점명','N 정보성','수량','N 임상/논문','수량','비고','블로그 총 수량','SEO 컨텐츠','비고','수량','최적배포','수량','인블','구분','연결','진행여부','패키지'];
   const row = ['11월','1일','피부과, 유앤아이','테스트','A',6,'B',2,'메모',8,'B','SEO 메모',8,'C',10,8,'직','','','브랜딩'];
   const csv = rows => rows.map(r => r.map(v => `"${String(v ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
+  const tabUrl = 'https://docs.google.com/spreadsheets/d/test-sheet/edit?gid=123#gid=123';
+  assert.equal(buildCsvExportUrl(tabUrl), 'https://docs.google.com/spreadsheets/d/test-sheet/export?format=csv&gid=123');
+  assert.equal(buildCsvExportUrl(tabUrl.replace('?gid=123','')), buildCsvExportUrl(tabUrl));
+  assert.equal(buildCsvExportUrl(tabUrl.replaceAll('123','0')).endsWith('gid=0'),true);
+  for (const bad of ['https://docs.google.com/spreadsheets/d/test/edit', tabUrl.replace('#gid=123','#gid=124'), tabUrl.replace('docs.google.com','evil.example'), tabUrl.replaceAll('123','abc')]) {
+    assert.throws(()=>buildCsvExportUrl(bad));
+  }
+  const october = [...row]; october[0]='10월';
+  const filename = name => `attachment; filename="fallback.csv"; filename*=UTF-8''${encodeURIComponent('업무 배정 - '+name+'.csv')}`;
+  assert.deepEqual(detectSheetPeriod(csv([header,october]),filename('2027.10')),
+    {month:'2027-10',monthLabel:'2027년 10월',sheetName:'2027.10'});
+  assert.equal(detectSheetPeriod(csv([header,october]), 'attachment; filename="book-2026.10.csv"').month,'2026-10');
+  assert.equal(detectSheetPeriod(csv([header,row]),filename('2026.11')).month,'2026-11');
+  const explicitYear=[...october]; explicitYear[0]='2027-10';
+  assert.equal(detectSheetPeriod(csv([header,explicitYear]),filename('2027.10')).month,'2027-10');
+  assert.throws(()=>detectSheetPeriod(csv([header,explicitYear]),filename('2026.10')),/일치하지/);
+  assert.throws(()=>detectSheetPeriod(csv([header,row,october]),filename('2026.11')),/일치하지/);
+  for (const name of ['10월','2027.00','2027.13','2027.10 수정']) {
+    assert.throws(()=>detectSheetPeriod(csv([header,october]),filename(name)),/탭 이름/);
+  }
+  assert.throws(()=>detectSheetPeriod(csv([header,october]),null),/탭 이름/);
+  assert.throws(()=>detectSheetPeriod(csv([header,october]),"attachment; filename*=UTF-8''%broken"),/탭 이름/);
+  assert.throws(()=>detectSheetPeriod(csv([header]),filename('2027.10')),/데이터가 없습니다/);
   const parsed = parseCSVRows(csv([header, row]))[0];
   assert.equal(parsed.mainWriter, 'A'); assert.equal(parsed.clinicalWriter, 'B');
   assert.equal(parsed.informationQuantity, 6); assert.equal(parsed.clinicalQuantity, 2);
@@ -97,7 +121,10 @@ try {
   assert.deepEqual(imported.new_assignments.map(a=>a.clinical_writer_id),['B','C']);
   assert.equal(imported.new_assignments[0].main_quantity,8);
   assert.equal(imported.new_assignments[0].information_quantity,6);
-  console.log('PASS: legacy formats, split/common ownership, no double count/review leakage, invalid quantities, month/schema guards');
+  await importCsvForMonth(fakeDb,csv([header,october]),'2027-10');
+  assert.equal(imported.target_month,'2027-10');
+  assert.equal(imported.new_assignments[0].month,'2027-10');
+  console.log('PASS: legacy formats, split/common ownership, no double count/review leakage, invalid quantities, month/schema guards, tab-derived years and month mismatch validation');
   if (process.argv[2]) {
     const values = JSON.parse(readFileSync(process.argv[2], 'utf8'));
     const rows = parseCSVRows(csv(values));

@@ -8,8 +8,9 @@ import type { User } from '@/types/database';
 import { Plus, Pencil, RefreshCw } from 'lucide-react';
 import WriterEditModal from './WriterEditModal';
 import { SortableHeader, useSort, sortRows } from '@/components/SortableHeader';
+import { writerAffiliation } from '@/lib/writer-affiliation';
 
-type WriterSortKey = 'name' | 'email' | 'phone' | 'role' | 'is_active';
+type WriterSortKey = 'name' | 'email' | 'phone' | 'affiliation' | 'is_active';
 
 export default function WritersPage() {
   const { isEditor } = useAuth();
@@ -194,8 +195,8 @@ export default function WritersPage() {
         {(['all', 'employee', 'freelancer'] as const).map(f => {
           const counts = {
             all: writers.length,
-            employee: writers.filter(w => w.role === 'employee').length,
-            freelancer: writers.filter(w => w.role === 'freelancer').length,
+            employee: writers.filter(w => writerAffiliation(w) === 'employee').length,
+            freelancer: writers.filter(w => writerAffiliation(w) === 'freelancer').length,
           };
           const labels = { all: '전체', employee: '직원', freelancer: '프리랜서' };
           return (
@@ -218,17 +219,18 @@ export default function WritersPage() {
               <SortableHeader<WriterSortKey> label="이름" sortKey="name" sort={sort} onSort={onSort} className="pl-6" />
               <SortableHeader<WriterSortKey> label="이메일" sortKey="email" sort={sort} onSort={onSort} />
               <SortableHeader<WriterSortKey> label="전화번호" sortKey="phone" sort={sort} onSort={onSort} />
-              <SortableHeader<WriterSortKey> label="소속" sortKey="role" sort={sort} onSort={onSort} align="center" />
+              <SortableHeader<WriterSortKey> label="소속 · 권한" sortKey="affiliation" sort={sort} onSort={onSort} align="center" />
               <SortableHeader<WriterSortKey> label="상태" sortKey="is_active" sort={sort} onSort={onSort} align="center" />
               <th className="px-6 py-3 text-center font-medium text-gray-600 text-xs">관리</th>
             </tr>
           </thead>
           <tbody>
             {(() => {
-              const filtered = writers.filter(w => filter === 'all' ? true : w.role === filter);
+              const filtered = writers.filter(w => filter === 'all' ? true : writerAffiliation(w) === filter);
               const sorted = sortRows(filtered, sort, (w, k) => {
                 if (k === 'is_active') return w.is_active ? 1 : 0;
-                return (w[k as 'name' | 'email' | 'phone' | 'role'] ?? '') as string;
+                if (k === 'affiliation') return writerAffiliation(w);
+                return (w[k] ?? '') as string;
               });
               if (loading) return <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">로딩 중...</td></tr>;
               if (sorted.length === 0) return <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">등록된 담당자가 없습니다.</td></tr>;
@@ -238,15 +240,14 @@ export default function WritersPage() {
                   <td className="px-6 py-3 text-gray-500">{w.email}</td>
                   <td className="px-6 py-3 text-gray-500">{w.phone || '-'}</td>
                   <td className="px-6 py-3 text-center">
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                      {writerAffiliation(w) === 'employee' ? '직원' : writerAffiliation(w) === 'freelancer' ? '프리랜서' : '협력사'}
+                    </span>{' '}
                     {w.role === 'admin' ? (
                       <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">관리자</span>
                     ) : w.role === 'editor' ? (
                       <span className="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">편집자</span>
-                    ) : w.role === 'employee' ? (
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">직원</span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">프리랜서</span>
-                    )}
+                    ) : null}
                   </td>
                   <td className="px-6 py-3 text-center">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${

@@ -20,7 +20,7 @@ export function workRolesFor(a: BlogAssignment, writerId: string): WorkRole[] {
   const roles: WorkRole[] = [];
   if (isBranding(a)) {
     if (a.information_quantity == null && a.clinical_quantity == null) {
-      if (a.main_writer_id === writerId) roles.push({ label: '블로그 · 유형 미구분', qty: a.main_quantity || 0 });
+      if (a.main_writer_id === writerId) roles.push({ label: '네이버 블로그', qty: a.main_quantity || 0 });
     } else {
       if (a.main_writer_id === writerId && (a.information_quantity || 0) > 0) roles.push({ label: '정보형', qty: a.information_quantity! });
       if (a.clinical_writer_id === writerId && (a.clinical_quantity || 0) > 0) roles.push({ label: '임상/논문형', qty: a.clinical_quantity! });
@@ -47,7 +47,7 @@ export function summarizeWork(assignments: BlogAssignment[], writerId: string) {
     information: 0, clinical: 0, unspecified: 0, seo: 0, blogTotal: 0 };
   const keys: Record<string, keyof typeof summary> = {
     '작성': 'writing', '검토': 'review', '부사수': 'sub', '최적': 'optimal', '인블': 'inbl',
-    '정보형': 'information', '임상/논문형': 'clinical', '블로그 · 유형 미구분': 'unspecified', 'SEO 콘텐츠': 'seo',
+    '정보형': 'information', '임상/논문형': 'clinical', '네이버 블로그': 'unspecified', 'SEO 콘텐츠': 'seo',
   };
   for (const a of assignments) {
     for (const role of workRolesFor(a, writerId)) {

@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
+ * 통합 양식(v4): E 네이버 블로그 / F 비고 / G 블로그 총 수량 /
+ * H SEO 컨텐츠 / I 비고 / J 수량. K~Q는 v2와 동일하다.
+ *
  * 2026-11 양식(v3): 고유 헤더로 담당자 블록을 찾고 블록 내 수량/비고를 읽는다.
  * N 정보성+수량 / N 임상/논문+수량 / 비고 / 블로그 총 수량 /
  * SEO 컨텐츠+비고+수량 / 최적배포+수량 / 인블 / 구분 / 연결 / 진행여부 / 패키지
@@ -40,7 +43,7 @@ export interface ParsedRow {
   operationType: string;    // 구분
   connectionName: string;   // 연결 (수강생/대행사 원본 이름)
   progressStatus: string;   // 진행여부
-  format: 'v1' | 'v2' | 'v3';
+  format: 'v1' | 'v2' | 'v3' | 'v4';
   packageName: string;
   clinicalWriter: string;
   informationQuantity: number | null;
@@ -171,11 +174,12 @@ export function parseCSV(text: string): string[][] {
 }
 
 /**
- * 유형별 배정(v3), 구분 열이 있는 양식(v2), 기존 양식(v1)을 판별
+ * 네이버 블로그 통합(v4), 유형별 배정(v3), 구분 열 양식(v2), 기존 양식(v1)을 판별
  * - v2: 헤더에 "구분" 있음 (N열 근처)
  */
-export function detectFormat(headerRow: string[]): 'v1' | 'v2' | 'v3' {
+export function detectFormat(headerRow: string[]): ParsedRow['format'] {
   const headers = headerRow.map(h => cleanStr(h));
+  if (headers.includes('네이버 블로그')) return 'v4';
   if (headers.includes('N 정보성') || headers.includes('N 임상/논문')) return 'v3';
   if (headers.some(h => h === '구분')) return 'v2';
   return 'v1';
@@ -188,6 +192,15 @@ export function parseCSVRows(csvText: string): ParsedRow[] {
   const parsed: ParsedRow[] = [];
   const format = detectFormat(allRows[0]);
   const headers = allRows[0].map(cleanStr);
+  if (format === 'v4') {
+    const expected = ['갱신월', '갱신일', '과목/병원명', '지점명', '네이버 블로그', '비고', '블로그 총 수량',
+      'SEO 컨텐츠', '비고', '수량', '최적배포', '수량', '인블', '구분', '연결', '진행여부', '패키지'];
+    expected.forEach((name, i) => {
+      if (headers[i] !== name && !(i === 7 && headers[i] === 'SEO 콘텐츠')) {
+        throw new Error(`통합 양식의 ${String.fromCharCode(65 + i)}열은 '${name}'이어야 합니다.`);
+      }
+    });
+  }
   const column = (name: string) => {
     const i = headers.indexOf(name);
     if (i < 0) throw new Error(`새 양식에 '${name}' 열이 없습니다.`);
@@ -234,9 +247,9 @@ export function parseCSVRows(csvText: string): ParsedRow[] {
       operationType = parseOperationType(cols[column('구분')] || '');
       connectionName = cleanStr(cols[column('연결')]);
       progressStatus = cleanStr(cols[column('진행여부')]);
-    } else if (format === 'v2') {
+    } else if (format === 'v2' || format === 'v4') {
       // K(10)=최적배포, L(11)=수량, M(12)=인블, N(13)=구분, O(14)=연결, P(15)=진행여부
-      inblQuantity = cleanNum(cols[12]);
+      inblQuantity = format === 'v4' ? quantity(cols[12], i + 1) ?? 0 : cleanNum(cols[12]);
       operationType = parseOperationType(cols[13] || '');
       connectionName = cleanStr(cols[14] || '');
       progressStatus = cleanStr(cols[15] || '');
@@ -255,7 +268,8 @@ export function parseCSVRows(csvText: string): ParsedRow[] {
     const clinicalWriter = format === 'v3' ? cleanStr(cols[clinicalCol]) : '';
     const informationQuantity = format === 'v3' ? quantity(cols[infoCol + 1], i + 1) : null;
     const clinicalQuantity = format === 'v3' ? quantity(cols[clinicalCol + 1], i + 1) : null;
-    const mainQuantity = format === 'v3' ? quantity(cols[totalCol], i + 1) : cleanNum(cols[6]);
+    const mainQuantity = format === 'v3' ? quantity(cols[totalCol], i + 1)
+      : format === 'v4' ? quantity(cols[6], i + 1) : cleanNum(cols[6]);
     if (format === 'v3' && packageName === '브랜딩') {
       if (mainQuantity == null) throw new Error(`${i + 1}행 ${branchName}: 블로그 총 수량이 필요합니다.`);
       const unsplit = informationQuantity == null && clinicalQuantity == null;
@@ -282,9 +296,11 @@ export function parseCSVRows(csvText: string): ParsedRow[] {
       mainQuantity: mainQuantity ?? 0,
       subWriter: cleanStr(cols[format === 'v3' ? seoCol : 7]),
       subNote: cleanStr(cols[format === 'v3' ? seoCol + 1 : 8]),
-      subQuantity: format === 'v3' ? quantity(cols[seoCol + 2], i + 1) ?? 0 : cleanNum(cols[9]),
+      subQuantity: format === 'v3' ? quantity(cols[seoCol + 2], i + 1) ?? 0
+        : format === 'v4' ? quantity(cols[9], i + 1) ?? 0 : cleanNum(cols[9]),
       optimalWriter: cleanStr(cols[format === 'v3' ? optimalCol : 10]),
-      optimalQuantity: format === 'v3' ? quantity(cols[optimalCol + 1], i + 1) ?? 0 : cleanNum(cols[11]),
+      optimalQuantity: format === 'v3' ? quantity(cols[optimalCol + 1], i + 1) ?? 0
+        : format === 'v4' ? quantity(cols[11], i + 1) ?? 0 : cleanNum(cols[11]),
       optimalNote,
       inblQuantity,
       operationType,
@@ -318,14 +334,14 @@ export async function importCsvForMonth(
   }
 
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('올바른 대상 월이 필요합니다.');
-  if (rows.some(r => r.format === 'v3') && month < '2026-11') throw new Error('새 양식은 2026년 11월부터 사용할 수 있습니다.');
+  if (rows.some(r => r.format === 'v3' || r.format === 'v4') && month < '2026-11') throw new Error('새 양식은 2026년 11월부터 사용할 수 있습니다.');
   for (const row of rows) {
     const m = row.renewalMonth.match(/^(?:(\d{4})-)?(\d{1,2})(?:월)?$/);
     if (!m || Number(m[2]) !== Number(month.slice(5)) || (m[1] && m[1] !== month.slice(0, 4))) {
       throw new Error('시트의 갱신월과 대상 월이 일치하지 않습니다.');
     }
   }
-  const hasNewFormat = rows.some(r => r.format === 'v3');
+  const hasNewFormat = rows.some(r => r.format === 'v3' || r.format === 'v4');
   if (hasNewFormat) {
     const { error } = await supabase.from('assignments')
       .select('package_name, information_quantity, clinical_writer_id, clinical_writer_name, clinical_quantity').limit(0);

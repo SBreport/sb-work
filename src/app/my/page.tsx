@@ -340,7 +340,7 @@ export default function FreelancerPage() {
   const brandingRoles = (summary: MonthSummary) => [
     { label: '정보형', qty: summary.information },
     { label: '임상/논문형', qty: summary.clinical },
-    { label: '블로그 · 유형 미구분', qty: summary.unspecified },
+    { label: '네이버 블로그', qty: summary.unspecified },
     { label: 'SEO 콘텐츠', qty: summary.seo },
   ].filter(role => role.qty > 0);
   const activeRoles = [
@@ -600,7 +600,6 @@ export default function FreelancerPage() {
                 <div className="text-xs text-gray-600 my-2">
                   <p>내 블로그 {curSummary.blogTotal}건 · SEO {curSummary.seo}건</p>
                   <p className="text-gray-400 mt-1">블로그 전월 {prevSummary?.blogTotal || 0}건 → 이번 달 {curSummary.blogTotal}건</p>
-                  {curSummary.unspecified > 0 && <p className="mt-1 text-gray-400">유형 미구분은 정보형·임상/논문형을 합친 수량입니다.</p>}
                 </div>
               )}
               {/* 전후월 */}
@@ -823,7 +822,7 @@ export default function FreelancerPage() {
                           )}
                         </div>
                       </div>
-                      {isBranding(a) && <p className="text-xs text-gray-500 mb-2">내 배정 합계 {a.totalQty}건{a.information_quantity == null && a.clinical_quantity == null && a.main_writer_id === uid ? ' · 블로그 유형별 수량 미구분' : ''}</p>}
+                      {isBranding(a) && <p className="text-xs text-gray-500 mb-2">내 배정 합계 {a.totalQty}건</p>}
                       {/* 하단: 역할 + 담당자 */}
                       <div className="flex items-center justify-between">
                         <div className="flex flex-wrap gap-1">

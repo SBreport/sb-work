@@ -632,8 +632,8 @@ export default function AssignmentsPage() {
                 <th className="px-2 py-2.5 text-left font-semibold text-gray-600 w-14">갱신일</th>
                 <th className="px-2 py-2.5 text-left font-semibold text-gray-600 w-20">과목</th>
                 <th className="px-2 py-2.5 text-left font-semibold text-gray-600">지점명</th>
-                <th className="px-2 py-2.5 text-left font-semibold text-blue-600 w-32 whitespace-nowrap">사수</th>
-                <th className="px-2 py-2.5 text-left font-semibold text-green-600 w-32 whitespace-nowrap">부사수</th>
+                <th className="px-2 py-2.5 text-left font-semibold text-blue-600 w-32 whitespace-nowrap">{assignments.some(isBranding) ? '네이버 블로그' : '사수'}</th>
+                <th className="px-2 py-2.5 text-left font-semibold text-green-600 w-32 whitespace-nowrap">{assignments.some(isBranding) ? 'SEO 콘텐츠' : '부사수'}</th>
                 <th className="px-2 py-2.5 text-left font-semibold text-purple-600 w-32 whitespace-nowrap">최적</th>
                 <th className="px-2 py-2.5 text-left font-semibold text-amber-600 w-36 whitespace-nowrap">인블</th>
                 <th className="px-2 py-2.5 text-center font-semibold text-gray-600 w-16">상태</th>
@@ -724,7 +724,7 @@ export default function AssignmentsPage() {
                         {isBranding(a) ? (
                           <div className="text-xs space-y-1">
                             {a.information_quantity == null && a.clinical_quantity == null ? (
-                              <p>{main.writerName || '미배정'} · 블로그 {a.main_quantity}건 (유형 미구분)</p>
+                              <p>{main.writerName || '미배정'} · 네이버 블로그 {a.main_quantity}건</p>
                             ) : <>
                               <p>정보형 {main.writerName || '미배정'} {a.information_quantity ?? 0}건</p>
                               <p>임상/논문형 {a.clinical_writer_name || '미배정'} {a.clinical_quantity ?? 0}건</p>

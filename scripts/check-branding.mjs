@@ -60,7 +60,7 @@ try {
   const stats = calcWriterStats([split]);
   assert.equal(totalQty(stats.A), 6); assert.equal(totalQty(stats.B), 10);
   const same = { ...split, main_writer_id:'B', main_writer_name:'B', information_quantity:null, clinical_quantity:null };
-  assert.deepEqual(workRolesFor(same, 'B'), [{label:'블로그 · 유형 미구분',qty:8},{label:'SEO 콘텐츠',qty:8}]);
+  assert.deepEqual(workRolesFor(same, 'B'), [{label:'네이버 블로그',qty:8},{label:'SEO 콘텐츠',qty:8}]);
   assert.equal(summarizeWork([same], 'B').total, 16);
   assert.equal(totalQty(calcWriterStats([same]).B), 16);
   const sameSplit = { ...split, main_writer_id:'B', main_writer_name:'B' };
@@ -124,6 +124,46 @@ try {
   await importCsvForMonth(fakeDb,csv([header,october]),'2027-10');
   assert.equal(imported.target_month,'2027-10');
   assert.equal(imported.new_assignments[0].month,'2027-10');
+  const unifiedHeaders = ['갱신월','갱신일','과목/병원명','지점명','네이버 블로그','비고','블로그 총 수량',
+    'SEO 컨텐츠','비고','수량','최적배포','수량','인블','구분','연결','진행여부','패키지'];
+  const unifiedRow = ['11월','1일','피부과','테스트','A','블로그 메모',8,'B','SEO 메모',5,'C',10,8,'직','','','브랜딩'];
+  const unified = parseCSVRows(csv([unifiedHeaders,unifiedRow]))[0];
+  assert.equal(unified.format,'v4');
+  assert.equal(unified.mainWriter,'A'); assert.equal(unified.mainQuantity,8); assert.equal(unified.mainNote,'블로그 메모');
+  assert.equal(unified.subWriter,'B'); assert.equal(unified.subQuantity,5); assert.equal(unified.subNote,'SEO 메모');
+  assert.equal(unified.packageName,'브랜딩'); assert.equal(unified.clinicalWriter,'');
+  const seoAlias = [...unifiedHeaders]; seoAlias[7]='SEO 콘텐츠';
+  assert.equal(parseCSVRows(csv([seoAlias,unifiedRow]))[0].subQuantity,5);
+  const shifted = [...unifiedHeaders]; [shifted[5],shifted[6]]=[shifted[6],shifted[5]];
+  assert.throws(()=>parseCSVRows(csv([shifted,unifiedRow])),/F열/);
+  assert.throws(()=>parseCSVRows(csv([unifiedHeaders.slice(0,16),unifiedRow])),/Q열/);
+  for (const col of [6,9,11,12]) {
+    for (const bad of ['abc',-1,1.5]) {
+      const invalidRow = [...unifiedRow]; invalidRow[col]=bad;
+      await assert.rejects(importCsvForMonth(noWrites,csv([unifiedHeaders,invalidRow]),'2026-11'),/0 이상의 정수/);
+    }
+  }
+  const oldMonth = [...unifiedRow]; oldMonth[0]='10월';
+  await assert.rejects(importCsvForMonth(noWrites,csv([unifiedHeaders,oldMonth]),'2026-10'),/11월부터/);
+  await assert.rejects(importCsvForMonth(noWrites,csv([unifiedHeaders,unifiedRow]),'2026-12'),/일치하지/);
+  await assert.rejects(importCsvForMonth(noSchema,csv([unifiedHeaders,unifiedRow]),'2026-11'),/마이그레이션/);
+  assert.equal(writes,0);
+  await importCsvForMonth(fakeDb,csv([unifiedHeaders,unifiedRow]),'2026-11');
+  const saved = imported.new_assignments[0];
+  assert.equal(saved.package_name,'브랜딩');
+  for (const field of ['information_quantity','clinical_quantity','clinical_writer_id','clinical_writer_name']) assert.equal(saved[field],null);
+  assert.deepEqual(workRolesFor(saved,'A'),[{label:'네이버 블로그',qty:8}]);
+  assert.deepEqual(workRolesFor(saved,'B'),[{label:'SEO 콘텐츠',qty:5}]);
+  assert.equal(summarizeWork([saved],'A').review,0);
+  assert.equal(totalQty(calcWriterStats([saved]).A),8);
+  assert.equal(totalQty(calcWriterStats([saved]).B),5);
+  const commonRow = [...unifiedRow]; commonRow[7]='A';
+  await importCsvForMonth(fakeDb,csv([unifiedHeaders,unifiedRow,commonRow]),'2026-11');
+  assert.deepEqual(imported.new_assignments.map(a=>a.slot),[1,2]);
+  assert.equal(summarizeWork([imported.new_assignments[1]],'A').total,13);
+  const failingRpc = { ...fakeDb, rpc() { return Promise.resolve({error:{message:'transaction failed'}}); } };
+  await assert.rejects(importCsvForMonth(failingRpc,csv([unifiedHeaders,unifiedRow]),'2026-11'),/배정 저장 실패: transaction failed/);
+  console.log('PASS: unified Naver/SEO headers, notes, package, clinical reset, strict quantities, month/schema guards and atomic RPC failure without delete fallback');
   console.log('PASS: legacy formats, split/common ownership, no double count/review leakage, invalid quantities, month/schema guards, tab-derived years and month mismatch validation');
   if (process.argv[2]) {
     const values = JSON.parse(readFileSync(process.argv[2], 'utf8'));

@@ -2,19 +2,21 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { assignmentWorkLabels, PACKAGE_WORK_LABELS, type BlogWorkLabel } from '@/lib/blog-assignment';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 
-interface MonthRoleData {
+type MonthRoleData = {
   month: string;
   label: string;
-  사수: number;
-  부사수: number;
   최적배포: number;
   인블: number;
   total: number;
-}
+} & Record<BlogWorkLabel, number>;
+
+const trendRoles: BlogWorkLabel[] = ['사수', '부사수', ...PACKAGE_WORK_LABELS];
+const trendColors = ['#3B82F6', '#10B981', '#2563EB', '#059669', '#7C3AED', '#0891B2'];
 
 function getRecentMonths(currentMonth: string, count: number): string[] {
   const [y, m] = currentMonth.split('-').map(Number);
@@ -46,20 +48,23 @@ export default function MonthlyTrendChart({ currentMonth }: Props) {
     // 한 번의 쿼리로 6개월 데이터 모두 가져오기
     const { data: assignments } = await supabase
       .from('assignments')
-      .select('month, main_quantity, sub_quantity, optimal_quantity, inbl_quantity')
+      .select('month, package_name, main_quantity, sub_quantity, optimal_quantity, inbl_quantity')
       .in('month', months);
 
     // 월별 집계
     const monthMap = new Map<string, MonthRoleData>();
     for (const m of months) {
-      monthMap.set(m, { month: m, label: monthLabel(m), 사수: 0, 부사수: 0, 최적배포: 0, 인블: 0, total: 0 });
+      monthMap.set(m, { month: m, label: monthLabel(m), 사수: 0, 부사수: 0,
+        '네이버 블로그': 0, 'SEO 콘텐츠': 0, '블로그(임상/논문)': 0, '블로그(정보성)': 0,
+        최적배포: 0, 인블: 0, total: 0 });
     }
 
     for (const a of assignments || []) {
       const entry = monthMap.get(a.month);
       if (!entry) continue;
-      entry.사수 += a.main_quantity || 0;
-      entry.부사수 += a.sub_quantity || 0;
+      const [mainLabel, subLabel] = assignmentWorkLabels(a);
+      entry[mainLabel] += a.main_quantity || 0;
+      entry[subLabel] += a.sub_quantity || 0;
       entry.최적배포 += a.optimal_quantity || 0;
       entry.인블 += a.inbl_quantity || 0;
       entry.total += (a.main_quantity || 0) + (a.sub_quantity || 0) + (a.optimal_quantity || 0) + (a.inbl_quantity || 0);
@@ -91,8 +96,9 @@ export default function MonthlyTrendChart({ currentMonth }: Props) {
             formatter={(value: unknown, name: unknown) => [`${value}건`, String(name)]}
           />
           <Legend wrapperStyle={{ fontSize: 11 }} />
-          <Bar dataKey="부사수" stackId="a" fill="#10B981" />
-          <Bar dataKey="사수" stackId="a" fill="#3B82F6" />
+          {trendRoles.map((role, index) => data.some(d => d[role] > 0) && (
+            <Bar key={role} dataKey={role} stackId="a" fill={trendColors[index]} />
+          ))}
           <Bar dataKey="인블" stackId="a" fill="#F59E0B" />
           <Bar dataKey="최적배포" stackId="a" fill="#8B5CF6" radius={[2, 2, 0, 0]} />
         </BarChart>

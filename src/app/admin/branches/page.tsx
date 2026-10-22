@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import type { Branch } from '@/types/database';
 import { Plus, Trash2, X, ChevronLeft, ChevronRight, Search, Edit3 } from 'lucide-react';
 import { SortableHeader, useSort, sortRows } from '@/components/SortableHeader';
+import { assignmentWorkLabels, usesPackageWorkTypes } from '@/lib/blog-assignment';
 
 type BranchSortKey = 'name' | 'category' | 'product_type' | 'status' | 'main' | 'sub' | 'optimal' | 'inbl';
 
@@ -14,6 +15,8 @@ const PRODUCT_TYPES = ['유앤아이', '로컬', '솔루션', '대행'];
 
 interface AssignmentSummary {
   id: string;
+  month: string;
+  package_name: string | null;
   main_writer_name: string | null;
   main_quantity: number;
   sub_writer_name: string | null;
@@ -253,13 +256,13 @@ function BranchDetailModal({ branch, onClose, onSave, onDelete, isEditor }: {
                     </div>
                     {assign.main_writer_name && (
                       <div className="flex justify-between">
-                        <span className="text-gray-500">사수</span>
+                        <span className="text-gray-500">{assignmentWorkLabels(assign)[0]}</span>
                         <span><span className="font-medium text-gray-900">{assign.main_writer_name}</span> <span className="text-blue-600 font-bold">{assign.main_quantity}건</span></span>
                       </div>
                     )}
                     {assign.sub_writer_name && (
                       <div className="flex justify-between">
-                        <span className="text-gray-500">부사수</span>
+                        <span className="text-gray-500">{assignmentWorkLabels(assign)[1]}</span>
                         <span><span className="font-medium text-gray-900">{assign.sub_writer_name}</span> <span className="text-green-600 font-bold">{assign.sub_quantity}건</span></span>
                       </div>
                     )}
@@ -484,8 +487,8 @@ export default function BranchesPage() {
                 <SortableHeader<BranchSortKey> label="과목" sortKey="category" sort={sort} onSort={onSort} className="w-16" />
                 <SortableHeader<BranchSortKey> label="유형" sortKey="product_type" sort={sort} onSort={onSort} className="w-16" />
                 <SortableHeader<BranchSortKey> label="상태" sortKey="status" sort={sort} onSort={onSort} align="center" className="w-12" />
-                <SortableHeader<BranchSortKey> label="사수" sortKey="main" sort={sort} onSort={onSort} align="center" className="w-20" />
-                <SortableHeader<BranchSortKey> label="부사수" sortKey="sub" sort={sort} onSort={onSort} align="center" className="w-20" />
+                <SortableHeader<BranchSortKey> label={usesPackageWorkTypes({ month }) ? '네이버 / 임상·논문' : '사수'} sortKey="main" sort={sort} onSort={onSort} align="center" className="w-20" />
+                <SortableHeader<BranchSortKey> label={usesPackageWorkTypes({ month }) ? 'SEO / 정보성' : '부사수'} sortKey="sub" sort={sort} onSort={onSort} align="center" className="w-20" />
                 <SortableHeader<BranchSortKey> label="최적배포" sortKey="optimal" sort={sort} onSort={onSort} align="center" className="w-20" />
                 <SortableHeader<BranchSortKey> label="인블" sortKey="inbl" sort={sort} onSort={onSort} align="center" className="w-20" />
               </tr>
@@ -510,13 +513,14 @@ export default function BranchesPage() {
                 }
                 return sortedBranches.map((b, idx) => {
                 const assigns = b.assignments;
-                const renderMultiCell = (getValue: (a: AssignmentSummary) => { name: string | null; qty: number }, colorClass: string) => {
+                const renderMultiCell = (getValue: (a: AssignmentSummary) => { name: string | null; qty: number; label?: string }, colorClass: string) => {
                   const parts = assigns.map(a => getValue(a)).filter(v => v.name);
                   if (parts.length === 0) return <span className="text-gray-300">-</span>;
                   return (
                     <div className="space-y-0.5">
                       {parts.map((v, i) => (
                         <div key={i} className="leading-tight">
+                          {v.label && <p className="text-[10px] text-gray-500">{v.label}</p>}
                           <span className="text-gray-700">{v.name}</span>
                           {' '}
                           <span className={`font-bold ${colorClass}`}>{v.qty}</span>
@@ -549,10 +553,10 @@ export default function BranchesPage() {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-center text-xs">
-                      {renderMultiCell(a => ({ name: a.main_writer_name, qty: a.main_quantity }), 'text-blue-600')}
+                      {renderMultiCell(a => ({ name: a.main_writer_name, qty: a.main_quantity, label: usesPackageWorkTypes(a) ? assignmentWorkLabels(a)[0] : undefined }), 'text-blue-600')}
                     </td>
                     <td className="px-3 py-2 text-center text-xs">
-                      {renderMultiCell(a => ({ name: a.sub_writer_name, qty: a.sub_quantity }), 'text-green-600')}
+                      {renderMultiCell(a => ({ name: a.sub_writer_name, qty: a.sub_quantity, label: usesPackageWorkTypes(a) ? assignmentWorkLabels(a)[1] : undefined }), 'text-green-600')}
                     </td>
                     <td className="px-3 py-2 text-center text-xs">
                       {renderMultiCell(a => ({ name: a.optimal_writer_name, qty: a.optimal_quantity }), 'text-indigo-600')}

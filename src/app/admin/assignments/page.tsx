@@ -14,7 +14,7 @@ import type { Assignment, User, AssignmentStatus } from '@/types/database';
 import { Plus, Copy, Download, Trash2, History, X } from 'lucide-react';
 import { STATUS_OPTIONS, ASSIGNMENT_STATUS_MAP } from '@/lib/constants';
 import { calcWriterStats, totalQty } from '@/lib/stats';
-import { isBranding } from '@/lib/blog-assignment';
+import { isBranding, usesPackageWorkTypes, assignmentWorkLabels } from '@/lib/blog-assignment';
 
 interface LogEntry {
   id: string;
@@ -287,10 +287,10 @@ export default function AssignmentsPage() {
       '과목',
       '유형',
       '지점명',
-      '사수',
-      '사수수량',
-      '부사수',
-      '부사수수량',
+      usesPackageWorkTypes({ month }) ? '네이버 블로그 / 블로그(임상/논문)' : '사수',
+      usesPackageWorkTypes({ month }) ? '블로그 수량' : '사수수량',
+      usesPackageWorkTypes({ month }) ? 'SEO 콘텐츠 / 블로그(정보성)' : '부사수',
+      usesPackageWorkTypes({ month }) ? 'SEO / 정보성 수량' : '부사수수량',
       '최적배포',
       '최적수량',
       '인블',
@@ -608,8 +608,12 @@ export default function AssignmentsPage() {
                           <span className="font-medium">{s.name}</span>
                           <span className="font-bold">{totalQty(s)}</span>
                           <span className="flex items-center gap-1 ml-0.5">
-                            {s.mainQty > 0 && <span className="text-blue-600 font-normal">사 {s.mainQty}</span>}
-                            {s.subQty > 0 && <span className="text-green-600 font-normal">부 {s.subQty}</span>}
+                            {usesPackageWorkTypes({ month }) ? Object.entries(s.workQty).filter(([, qty]) => qty > 0).map(([label, qty]) => (
+                              <span key={label} className="text-blue-600 font-normal">{label} {qty}</span>
+                            )) : <>
+                              {s.mainQty > 0 && <span className="text-blue-600 font-normal">사 {s.mainQty}</span>}
+                              {s.subQty > 0 && <span className="text-green-600 font-normal">부 {s.subQty}</span>}
+                            </>}
                             {s.optimalQty > 0 && <span className="text-purple-600 font-normal">최 {s.optimalQty}</span>}
                             {s.inblQty > 0 && <span className="text-amber-600 font-normal">인 {s.inblQty}</span>}
                           </span>
@@ -632,8 +636,8 @@ export default function AssignmentsPage() {
                 <th className="px-2 py-2.5 text-left font-semibold text-gray-600 w-14">갱신일</th>
                 <th className="px-2 py-2.5 text-left font-semibold text-gray-600 w-20">과목</th>
                 <th className="px-2 py-2.5 text-left font-semibold text-gray-600">지점명</th>
-                <th className="px-2 py-2.5 text-left font-semibold text-blue-600 w-32 whitespace-nowrap">{assignments.some(isBranding) ? '네이버 블로그' : '사수'}</th>
-                <th className="px-2 py-2.5 text-left font-semibold text-green-600 w-32 whitespace-nowrap">{assignments.some(isBranding) ? 'SEO 콘텐츠' : '부사수'}</th>
+                <th className="px-2 py-2.5 text-left font-semibold text-blue-600 w-32 whitespace-nowrap">{usesPackageWorkTypes({ month }) ? '네이버 / 임상·논문' : '사수'}</th>
+                <th className="px-2 py-2.5 text-left font-semibold text-green-600 w-32 whitespace-nowrap">{usesPackageWorkTypes({ month }) ? 'SEO / 정보성' : '부사수'}</th>
                 <th className="px-2 py-2.5 text-left font-semibold text-purple-600 w-32 whitespace-nowrap">최적</th>
                 <th className="px-2 py-2.5 text-left font-semibold text-amber-600 w-36 whitespace-nowrap">인블</th>
                 <th className="px-2 py-2.5 text-center font-semibold text-gray-600 w-16">상태</th>
@@ -731,26 +735,30 @@ export default function AssignmentsPage() {
                               <p className="text-gray-400">블로그 총 {a.main_quantity}건 · 시트에서 수정</p>
                             </>}
                           </div>
-                        ) : <div className="flex items-center gap-2">
-                          <div className="min-w-0 flex-1 truncate">
-                            {renderWriterCell(main.writerName, main.colorClass, a.main_writer_id || '', 'main')}
-                          </div>
-                          <div className="text-blue-600 font-semibold text-right shrink-0 w-8">
-                            {isEditor ? (
-                              <span>{a.main_quantity}</span>
-                            ) : (
-                              <InlineEditCell
-                                value={a.main_quantity}
-                                type="number"
-                                min={0}
-                                onSave={v => updateField(a.id, 'main_quantity', v)}
-                              />
-                            )}
+                        ) : <div>
+                          {usesPackageWorkTypes(a) && <p className="text-[10px] text-gray-500 mb-1">{assignmentWorkLabels(a)[0]}</p>}
+                          <div className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1 truncate">
+                              {renderWriterCell(main.writerName, main.colorClass, a.main_writer_id || '', 'main')}
+                            </div>
+                            <div className="text-blue-600 font-semibold text-right shrink-0 w-8">
+                              {isEditor ? (
+                                <span>{a.main_quantity}</span>
+                              ) : (
+                                <InlineEditCell
+                                  value={a.main_quantity}
+                                  type="number"
+                                  min={0}
+                                  onSave={v => updateField(a.id, 'main_quantity', v)}
+                                />
+                              )}
+                            </div>
                           </div>
                         </div>}
                       </td>
                       {/* 부사수 */}
                       <td className="px-2 py-1.5 whitespace-nowrap">
+                        {usesPackageWorkTypes(a) && <p className="text-[10px] text-gray-500 mb-1">{assignmentWorkLabels(a)[1]}</p>}
                         <div className="flex items-center gap-2">
                           <div className="min-w-0 flex-1 truncate">
                             {renderWriterCell(sub.writerName, sub.colorClass, a.sub_writer_id || '', 'sub')}

@@ -16,7 +16,7 @@ try {
   const require = createRequire(import.meta.url);
   const { buildCsvExportUrl, detectSheetPeriod } = require(join(dir, 'sheet-period.cjs'));
   const { parseCSVRows, importCsvForMonth } = require(join(dir, 'csv-import.cjs'));
-  const { workRolesFor, summarizeWork, isBranding, assignmentWriterFilter } = require(join(dir, 'blog-assignment.cjs'));
+  const { workRolesFor, summarizeWork, isBranding, assignmentWriterFilter, assignmentWorkLabels, blogQuantityFor } = require(join(dir, 'blog-assignment.cjs'));
   const { calcWriterStats, totalQty } = require(join(dir, 'stats.cjs'));
   const header = ['갱신월','갱신일','과목/병원명','지점명','N 정보성','수량','N 임상/논문','수량','비고','블로그 총 수량','SEO 컨텐츠','비고','수량','최적배포','수량','인블','구분','연결','진행여부','패키지'];
   const row = ['11월','1일','피부과, 유앤아이','테스트','A',6,'B',2,'메모',8,'B','SEO 메모',8,'C',10,8,'직','','','브랜딩'];
@@ -124,6 +124,35 @@ try {
   await importCsvForMonth(fakeDb,csv([header,october]),'2027-10');
   assert.equal(imported.target_month,'2027-10');
   assert.equal(imported.new_assignments[0].month,'2027-10');
+  for (const month of ['2026-11','2026-12','2027-01']) {
+    for (const package_name of [null,undefined,'','일반','신규']) {
+      const a = { month, package_name, main_writer_id:'A',main_writer_name:'A',main_quantity:4,
+        sub_writer_id:'B',sub_writer_name:'B',sub_quantity:8 };
+      assert.deepEqual(assignmentWorkLabels(a),['블로그(임상/논문)','블로그(정보성)']);
+      assert.deepEqual(workRolesFor(a,'A'),[{label:'블로그(임상/논문)',qty:4}]);
+      assert.deepEqual(workRolesFor(a,'B'),[{label:'블로그(정보성)',qty:8}]);
+      assert.equal(summarizeWork([a],'A').review,0);
+      assert.equal(summarizeWork([a],'B').blogTotal,8);
+      assert.equal(blogQuantityFor(a,'B'),8);
+      const combined = {...a,sub_writer_id:'A',sub_writer_name:'A'};
+      assert.equal(summarizeWork([combined],'A').total,12);
+      assert.equal(summarizeWork([combined],'A').blogTotal,12);
+      const stats = calcWriterStats([combined]).A;
+      assert.equal(stats.workQty['블로그(임상/논문)'],4);
+      assert.equal(stats.workQty['블로그(정보성)'],8);
+      assert.equal(totalQty(stats),12);
+      const october = {...a,month:'2026-10'};
+      assert.deepEqual(assignmentWorkLabels(october),['사수','부사수']);
+      assert.deepEqual(workRolesFor(october,'A'),[{label:'작성',qty:4},{label:'검토',qty:8}]);
+    }
+  }
+  assert.deepEqual(assignmentWorkLabels({month:'2026-11',package_name:' 브랜딩 '}),['네이버 블로그','SEO 콘텐츠']);
+  assert.deepEqual(assignmentWorkLabels({month:'2026-10',package_name:'브랜딩'}),['사수','부사수']);
+  const brandingStats = calcWriterStats([same]).B;
+  assert.equal(brandingStats.workQty['네이버 블로그'],8);
+  assert.equal(brandingStats.workQty['SEO 콘텐츠'],8);
+  assert.equal(totalQty(brandingStats),16);
+  console.log('PASS: November package labels, blank/non-branding packages, separate/shared writers, dashboard categories and October review compatibility');
   const unifiedHeaders = ['갱신월','갱신일','과목/병원명','지점명','네이버 블로그','비고','블로그 총 수량',
     'SEO 컨텐츠','비고','수량','최적배포','수량','인블','구분','연결','진행여부','패키지'];
   const unifiedRow = ['11월','1일','피부과','테스트','A','블로그 메모',8,'B','SEO 메모',5,'C',10,8,'직','','','브랜딩'];

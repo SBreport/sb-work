@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { assignmentWriterFilter, isBranding, summarizeWork, workRolesFor } from '@/lib/blog-assignment';
+import { assignmentWriterFilter, isBranding, usesPackageWorkTypes, summarizeWork, workRolesFor } from '@/lib/blog-assignment';
 import { useAuth } from '@/lib/auth-context';
 import { getCurrentMonth, getAdjacentMonth, shortMonthLabel } from '@/lib/date';
 import MonthSelector from '@/components/MonthSelector';
@@ -239,7 +239,7 @@ export default function FreelancerPage() {
         const roles = workRolesFor(a, uid);
         let partnerName: string | null = null;
         let partnerRole: string | null = null;
-        if (!isBranding(a)) {
+        if (!usesPackageWorkTypes(a)) {
           if (a.main_writer_id === uid && a.sub_writer_id !== uid) {
             partnerName = (a.sub_writer as { name: string } | undefined)?.name || a.sub_writer_name || null;
             partnerRole = ROLE.SUB;
@@ -319,7 +319,7 @@ export default function FreelancerPage() {
     const partners: Record<string, { name: string; role: string; count: number; qty: number }> = {};
     let bothCount = 0;
     for (const a of myAssignments) {
-      if (!isBranding(a) && a.main_writer_id === uid && a.sub_writer_id === uid) { bothCount++; continue; }
+      if (!usesPackageWorkTypes(a) && a.main_writer_id === uid && a.sub_writer_id === uid) { bothCount++; continue; }
       if (a.partnerName && a.partnerRole) {
         const key = `${a.partnerName}-${a.partnerRole}`;
         if (!partners[key]) partners[key] = { name: a.partnerName, role: a.partnerRole, count: 0, qty: 0 };
@@ -334,17 +334,17 @@ export default function FreelancerPage() {
   const hasMultipleTypes = Object.keys(byType).length > 1;
   const hasPartners = partnerSummary.partners.length > 0 || partnerSummary.bothCount > 0;
   // 사수 여부 → 테이블 컬럼 분기용 (검토 or 겸임 부사수 건수 있으면)
-  const hasBranding = myAssignments.some(isBranding);
-  const isReviewer = !hasBranding && curSummary.writing > 0 && (curSummary.review > 0 || myAssignments.some(a => a.main_writer_id === uid && a.sub_writer_id === uid && a.sub_quantity > 0));
+  const hasPackageWorkTypes = usesPackageWorkTypes({ month });
+  const isReviewer = !hasPackageWorkTypes && curSummary.writing > 0 && (curSummary.review > 0 || myAssignments.some(a => a.main_writer_id === uid && a.sub_writer_id === uid && a.sub_quantity > 0));
 
-  const brandingRoles = (summary: MonthSummary) => [
-    { label: '정보형', qty: summary.information },
-    { label: '임상/논문형', qty: summary.clinical },
+  const packageRoles = (summary: MonthSummary) => [
     { label: '네이버 블로그', qty: summary.unspecified },
     { label: 'SEO 콘텐츠', qty: summary.seo },
+    { label: '블로그(임상/논문)', qty: summary.clinical },
+    { label: '블로그(정보성)', qty: summary.information },
   ].filter(role => role.qty > 0);
   const activeRoles = [
-    ...brandingRoles(curSummary),
+    ...packageRoles(curSummary),
     curSummary.writing > 0 ? { label: '사수원고', qty: curSummary.writing } : null,
     curSummary.review > 0 ? { label: '부사수원고', qty: curSummary.review } : null,
     curSummary.sub > 0 ? { label: '부사수', qty: curSummary.sub } : null,
@@ -456,7 +456,7 @@ export default function FreelancerPage() {
 
               // 하단 역할 태그 (사수 카드일 경우 writing/sub 계열은 상단에 표시되므로 제외)
               const otherRoles = [
-                ...brandingRoles(card).map(role => ({ ...role, color: 'text-blue-600' })),
+                ...packageRoles(card).map(role => ({ ...role, color: 'text-blue-600' })),
                 !hasWritingAndReview && card.writing > 0 ? { label: ROLE.WRITING, qty: card.writing, color: 'text-blue-600' } : null,
                 !hasWritingAndReview && subTotal > 0 ? { label: ROLE.SUB, qty: subTotal, color: 'text-green-600' } : null,
                 card.optimal > 0 ? { label: ROLE.OPTIMAL, qty: card.optimal, color: 'text-purple-600' } : null,
@@ -596,7 +596,7 @@ export default function FreelancerPage() {
                   ))}
                 </div>
               </div>
-              {hasBranding && (
+              {hasPackageWorkTypes && (
                 <div className="text-xs text-gray-600 my-2">
                   <p>내 블로그 {curSummary.blogTotal}건 · SEO {curSummary.seo}건</p>
                   <p className="text-gray-400 mt-1">블로그 전월 {prevSummary?.blogTotal || 0}건 → 이번 달 {curSummary.blogTotal}건</p>
@@ -717,7 +717,7 @@ export default function FreelancerPage() {
                           <th className="px-2 py-2 font-medium text-indigo-600 text-xs whitespace-nowrap text-center w-16">부사수원고</th>
                         </>
                       ) : (
-                        <SortHeader label={hasBranding ? "내 업무·수량" : "포스팅"} sortKeyName="qty" className="text-center w-16" />
+                        <SortHeader label={hasPackageWorkTypes ? "내 업무·수량" : "포스팅"} sortKeyName="qty" className="text-center w-16" />
                       )}
                       <th className="px-2 py-2 font-medium text-gray-500 text-xs whitespace-nowrap text-center">진행여부</th>
                       <th className="px-3 py-2 text-left font-medium text-gray-500 text-xs whitespace-nowrap">함께하는 담당자</th>
@@ -760,13 +760,13 @@ export default function FreelancerPage() {
                             </>
                           ) : (
                             <td className="px-2 py-1.5 text-center">
-                              {isBranding(a) ? (
+                              {usesPackageWorkTypes(a) ? (
                                 <div className="space-y-1 text-left min-w-36">
                                   {a.roles.map(role => <div key={role.label} className="text-xs whitespace-nowrap">{role.label} <strong>{role.qty}건</strong></div>)}
                                   <div className="text-xs font-semibold">내 배정 합계 {a.totalQty}건</div>
                                 </div>
                               ) : a.totalQty > 0 ? (
-                                <div><span className="font-bold text-sm text-gray-900">{a.totalQty}</span>{hasBranding && a.roles.map(r => <p key={r.label} className="text-xs text-gray-500">{r.label} {r.qty}건</p>)}</div>
+                                <div><span className="font-bold text-sm text-gray-900">{a.totalQty}</span>{hasPackageWorkTypes && a.roles.map(r => <p key={r.label} className="text-xs text-gray-500">{r.label} {r.qty}건</p>)}</div>
                               ) : (
                                 <span className="font-bold text-sm text-red-500">0</span>
                               )}
@@ -807,7 +807,7 @@ export default function FreelancerPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          {!isBranding(a) && a.roles.length > 1 ? (
+                          {!usesPackageWorkTypes(a) && a.roles.length > 1 ? (
                             <div className="flex flex-col items-end gap-0">
                               {a.roles.map(r => (
                                 <p key={r.label} className={`text-xs font-bold leading-tight ${r.label === ROLE.WRITING ? 'text-blue-600' : r.label === ROLE.REVIEW ? 'text-indigo-600' : r.label === ROLE.SUB ? 'text-green-600' : 'text-gray-700'}`}>
@@ -822,7 +822,7 @@ export default function FreelancerPage() {
                           )}
                         </div>
                       </div>
-                      {isBranding(a) && <p className="text-xs text-gray-500 mb-2">내 배정 합계 {a.totalQty}건</p>}
+                      {usesPackageWorkTypes(a) && <p className="text-xs text-gray-500 mb-2">내 배정 합계 {a.totalQty}건</p>}
                       {/* 하단: 역할 + 담당자 */}
                       <div className="flex items-center justify-between">
                         <div className="flex flex-wrap gap-1">

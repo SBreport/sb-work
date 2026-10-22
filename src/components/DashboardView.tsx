@@ -15,7 +15,7 @@ import type { Assignment, AssignmentStatus } from '@/types/database';
 import { AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { calcWriterStats, totalQty } from '@/lib/stats';
 import { ASSIGNMENT_STATUS_MAP } from '@/lib/constants';
-import { isBranding } from '@/lib/blog-assignment';
+import { usesPackageWorkTypes, PACKAGE_WORK_LABELS } from '@/lib/blog-assignment';
 
 export default function DashboardView() {
   const [month, setMonth] = useState(getCurrentMonth());
@@ -80,7 +80,7 @@ export default function DashboardView() {
     return { totalPosts: total, prevTotalPosts: prevTotal, postsDiff: total - prevTotal, statusCounts: counts, unassigned: unas, sortedWriters: sorted };
   }, [assignments, prevAssignments, stats]);
 
-  const hasBranding = assignments.some(isBranding);
+  const hasPackageWorkTypes = usesPackageWorkTypes({ month });
 
   return (
     <div className="p-4 max-w-[1200px]">
@@ -144,7 +144,7 @@ export default function DashboardView() {
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 mb-3 flex items-center gap-2">
               <AlertCircle size={16} className="text-amber-500 shrink-0" />
               <p className="text-xs text-amber-800">
-                <span className="font-semibold">사수 미배정 {unassigned.length}건</span>
+                <span className="font-semibold">{hasPackageWorkTypes ? '블로그 담당 미배정' : '사수 미배정'} {unassigned.length}건</span>
                 <span className="text-amber-600 ml-2">
                   {unassigned.slice(0, 5).map(a => a.branch?.name || '알 수 없음').join(', ')}
                   {unassigned.length > 5 && ` 외 ${unassigned.length - 5}건`}
@@ -169,8 +169,9 @@ export default function DashboardView() {
                 <thead>
                   <tr className="border-b border-gray-200 text-xs">
                     <th className="px-4 py-2.5 text-left font-semibold text-gray-600 w-24">담당자</th>
-                    <th className="px-3 py-2.5 text-center font-semibold text-blue-600 w-16">{hasBranding ? '블로그/사수' : '사수'}</th>
-                    <th className="px-3 py-2.5 text-center font-semibold text-green-600 w-16">{hasBranding ? 'SEO/부사수' : '부사수'}</th>
+                    {(hasPackageWorkTypes ? PACKAGE_WORK_LABELS : ['사수', '부사수']).map(label => (
+                      <th key={label} className="px-3 py-2.5 text-center font-semibold text-blue-600 whitespace-nowrap">{label}</th>
+                    ))}
                     <th className="px-3 py-2.5 text-center font-semibold text-purple-600 w-16">최적</th>
                     <th className="px-3 py-2.5 text-center font-semibold text-amber-600 w-16">인블</th>
                     <th className="px-3 py-2.5 text-center font-bold text-gray-900 w-16">합계</th>
@@ -186,8 +187,9 @@ export default function DashboardView() {
                     return (
                       <tr key={id} className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors">
                         <td className="px-4 py-2 font-medium text-gray-900">{s.name}</td>
-                        <td className="px-3 py-2 text-center text-blue-600 font-medium">{s.mainQty || <span className="text-gray-200">-</span>}</td>
-                        <td className="px-3 py-2 text-center text-green-600 font-medium">{s.subQty || <span className="text-gray-200">-</span>}</td>
+                        {(hasPackageWorkTypes ? PACKAGE_WORK_LABELS.map(label => s.workQty[label] || 0) : [s.mainQty, s.subQty]).map((qty, index) => (
+                          <td key={index} className="px-3 py-2 text-center text-blue-600 font-medium">{qty || <span className="text-gray-200">-</span>}</td>
+                        ))}
                         <td className="px-3 py-2 text-center text-purple-600 font-medium">{s.optimalQty || <span className="text-gray-200">-</span>}</td>
                         <td className="px-3 py-2 text-center text-amber-600 font-medium">{s.inblQty || <span className="text-gray-200">-</span>}</td>
                         <td className="px-3 py-2 text-center font-bold text-gray-900">{total}</td>
@@ -206,7 +208,7 @@ export default function DashboardView() {
                     );
                   })}
                   {sortedWriters.length === 0 && (
-                    <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-sm">이 달의 배정 데이터가 없습니다.</td></tr>
+                    <tr><td colSpan={hasPackageWorkTypes ? 11 : 9} className="px-4 py-8 text-center text-gray-400 text-sm">이 달의 배정 데이터가 없습니다.</td></tr>
                   )}
                 </tbody>
               </table>

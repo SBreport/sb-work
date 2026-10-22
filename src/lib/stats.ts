@@ -1,7 +1,7 @@
 /* ── 담당자별 수량 집계 유틸리티 ── */
 
 import type { Assignment } from '../types/database';
-import { isBranding, blogQuantityFor } from './blog-assignment';
+import { isBranding, blogQuantityFor, assignmentWorkLabels } from './blog-assignment';
 
 export interface WriterStats {
   name: string;
@@ -11,6 +11,7 @@ export interface WriterStats {
   inblQty: number;
   branchCount: number;
   prevTotal: number;
+  workQty: Record<string, number>;
 }
 
 export function totalQty(s: { mainQty: number; subQty: number; optimalQty: number; inblQty: number }) {
@@ -19,6 +20,7 @@ export function totalQty(s: { mainQty: number; subQty: number; optimalQty: numbe
 
 export function calcWriterStats(assignments: Partial<Assignment>[]): Record<string, WriterStats> {
   return assignments.reduce<Record<string, WriterStats>>((acc, a) => {
+    const [mainLabel, subLabel] = assignmentWorkLabels(a);
     const addWriter = (
       id: string | null | undefined,
       nameObj: unknown,
@@ -29,7 +31,11 @@ export function calcWriterStats(assignments: Partial<Assignment>[]): Record<stri
       const name = (nameObj as { name: string } | undefined)?.name || nameFallback;
       if (!name) return;
       const key = id || `name:${name}`;
-      if (!acc[key]) acc[key] = { name, mainQty: 0, subQty: 0, optimalQty: 0, inblQty: 0, branchCount: 0, prevTotal: 0 };
+      if (!acc[key]) acc[key] = { name, mainQty: 0, subQty: 0, optimalQty: 0, inblQty: 0, branchCount: 0, prevTotal: 0, workQty: {} };
+      if (role === 'main' || role === 'sub') {
+        const label = role === 'main' ? mainLabel : subLabel;
+        acc[key].workQty[label] = (acc[key].workQty[label] || 0) + qty;
+      }
       if (role === 'main') { acc[key].mainQty += qty; acc[key].branchCount++; }
       if (role === 'sub') acc[key].subQty += qty;
       if (role === 'optimal') acc[key].optimalQty += qty;

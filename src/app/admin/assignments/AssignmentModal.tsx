@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import type { Assignment, User, Branch } from '@/types/database';
 import { STATUS_OPTIONS } from '@/lib/constants';
 import { X } from 'lucide-react';
+import { assignmentWorkLabels } from '@/lib/blog-assignment';
 
 interface Props {
   assignment: Assignment | null;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function AssignmentModal({ assignment, month, writers, onClose, onSave }: Props) {
+  const [mainLabel, subLabel] = assignmentWorkLabels({ month, package_name: assignment?.package_name });
   const [branches, setBranches] = useState<Branch[]>([]);
   const [form, setForm] = useState({
     branch_id: assignment?.branch_id || '',
@@ -138,7 +140,7 @@ export default function AssignmentModal({ assignment, month, writers, onClose, o
           {/* 사수 */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">사수</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{mainLabel}</label>
               <select
                 value={form.main_writer_id}
                 onChange={(e) => setForm({ ...form, main_writer_id: e.target.value })}
@@ -151,7 +153,7 @@ export default function AssignmentModal({ assignment, month, writers, onClose, o
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">사수 수량</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{mainLabel} 수량</label>
               <input
                 type="number"
                 min={0}
@@ -165,7 +167,7 @@ export default function AssignmentModal({ assignment, month, writers, onClose, o
           {/* 부사수 */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">부사수</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{subLabel}</label>
               <select
                 value={form.sub_writer_id}
                 onChange={(e) => setForm({ ...form, sub_writer_id: e.target.value })}
@@ -178,7 +180,7 @@ export default function AssignmentModal({ assignment, month, writers, onClose, o
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">부사수 수량</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{subLabel} 수량</label>
               <input
                 type="number"
                 min={0}

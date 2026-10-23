@@ -359,15 +359,14 @@ export default function FreelancerPage() {
     if (a.partners.length === 0) return <span className="text-gray-300">-</span>;
     return (
       <div className="space-y-1 text-left">
-        {a.partners.map((partner, index) => {
-          const color = partnerColorMap[partner.name];
+        {[...new Set(a.partners.map(partner => partner.name))].map(name => {
+          const color = partnerColorMap[name];
           return (
-            <div key={`${partner.name}-${partner.role}-${index}`}>
+            <div key={name}>
               <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${color ? `${color.bg} ${color.text} ${color.border}` : 'bg-gray-50 text-gray-700 border-gray-200'}`}>
                 {color && <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />}
-                {partner.name}
+                {name}
               </span>
-              <p className="mt-0.5 text-[11px] text-gray-500">{partner.role} {partner.qty}건</p>
             </div>
           );
         })}
@@ -758,7 +757,6 @@ export default function FreelancerPage() {
                               {usesPackageWorkTypes(a) ? (
                                 <div className="space-y-1 text-left min-w-36">
                                   {a.roles.map(role => <div key={role.label} className="text-xs whitespace-nowrap">{role.label} <strong>{role.qty}건</strong></div>)}
-                                  <div className="text-xs font-semibold">내 배정 합계 {a.totalQty}건</div>
                                 </div>
                               ) : a.totalQty > 0 ? (
                                 <div><span className="font-bold text-sm text-gray-900">{a.totalQty}</span>{hasPackageWorkTypes && a.roles.map(r => <p key={r.label} className="text-xs text-gray-500">{r.label} {r.qty}건</p>)}</div>
@@ -812,7 +810,6 @@ export default function FreelancerPage() {
                           )}
                         </div>
                       </div>
-                      {usesPackageWorkTypes(a) && <p className="text-xs text-gray-500 mb-2">내 배정 합계 {a.totalQty}건</p>}
                       {/* 하단: 역할 + 담당자 */}
                       <div className="flex items-center justify-between">
                         <div className="flex flex-wrap gap-1">

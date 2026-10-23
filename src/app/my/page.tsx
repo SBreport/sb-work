@@ -513,12 +513,9 @@ export default function FreelancerPage() {
                         {card.total}<span className="text-xs font-normal text-gray-400 ml-0.5">건</span>
                       </p>
                       <p className="text-[10px] text-gray-400 mb-2">
-                        {isEmpty ? '배정 없음' : `${card.branchCount}개 지점`}
+                        {isEmpty ? '이번 달 배정 없음' : `${card.branchCount}개 지점`}
                         {card.hasChange && !isEmpty && (
                           <span className="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded font-semibold">변경</span>
-                        )}
-                        {card.hasChange && isEmpty && (
-                          <span className="ml-1 px-1.5 py-0.5 bg-red-100 text-red-500 border border-red-200 rounded font-semibold">중단</span>
                         )}
                       </p>
                     </>

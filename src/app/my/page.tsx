@@ -528,7 +528,7 @@ export default function FreelancerPage() {
                   {otherRoles.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {otherRoles.map(r => (
-                        <span key={r.label} className={`text-[10px] ${WORK_ROLE_STYLES[r.label] ? `rounded border px-1.5 py-0.5 ${WORK_ROLE_STYLES[r.label].className}` : r.color}`}>
+                        <span key={r.label} className={`text-[10px] ${WORK_ROLE_STYLES[r.label] ? `rounded-full border px-1.5 py-0.5 ${WORK_ROLE_STYLES[r.label].className}` : r.color}`}>
                           {WORK_ROLE_STYLES[r.label]?.label || r.label} {r.qty}
                         </span>
                       ))}

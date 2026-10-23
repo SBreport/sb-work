@@ -2,6 +2,7 @@ import type { Assignment } from '../types/database';
 
 export type BlogAssignment = Partial<Assignment>;
 export interface WorkRole { label: string; qty: number }
+export interface AssignmentPartner { name: string; role: string; qty: number }
 
 export const PACKAGE_WORK_LABELS = ['네이버 블로그', 'SEO 콘텐츠', '블로그(임상/논문)', '블로그(정보성)'] as const;
 export type BlogWorkLabel = typeof PACKAGE_WORK_LABELS[number] | '사수' | '부사수';
@@ -17,6 +18,29 @@ export function isBranding(a: Pick<BlogAssignment, 'month' | 'package_name'>): b
 export function assignmentWorkLabels(a: Pick<BlogAssignment, 'month' | 'package_name'>): [BlogWorkLabel, BlogWorkLabel] {
   if (!usesPackageWorkTypes(a)) return ['사수', '부사수'];
   return isBranding(a) ? ['네이버 블로그', 'SEO 콘텐츠'] : ['블로그(임상/논문)', '블로그(정보성)'];
+}
+
+export function assignmentPartnersFor(a: BlogAssignment, writerId: string): AssignmentPartner[] {
+  const [mainLabel, subLabel] = assignmentWorkLabels(a);
+  const candidates = [
+    { id: a.main_writer_id, name: a.main_writer?.name || a.main_writer_name, role: mainLabel, qty: a.main_quantity || 0 },
+    { id: a.sub_writer_id, name: a.sub_writer?.name || a.sub_writer_name, role: subLabel, qty: a.sub_quantity || 0 },
+  ];
+  if (usesPackageWorkTypes(a)) {
+    if (isBranding(a) && (a.information_quantity != null || a.clinical_quantity != null)) {
+      candidates[0] = { ...candidates[0], qty: a.information_quantity || 0 };
+      candidates.push({ id: a.clinical_writer_id, name: a.clinical_writer_name,
+        role: mainLabel, qty: a.clinical_quantity || 0 });
+    }
+    if (!writerId || !candidates.some(p => p.id === writerId)) return [];
+    const ownNames = candidates.filter(p => p.id === writerId).map(p => p.name);
+    return candidates.filter(p => p.id !== writerId && p.name && !ownNames.includes(p.name) && p.qty > 0)
+      .map(p => ({ name: p.name!, role: p.role, qty: p.qty }));
+  }
+  // 과거 월은 사수·부사수의 상대 담당자만 표시한다.
+  const partner = a.main_writer_id === writerId && a.sub_writer_id !== writerId ? candidates[1]
+    : a.sub_writer_id === writerId && a.main_writer_id !== writerId ? candidates[0] : null;
+  return partner?.name ? [{ name: partner.name, role: partner.role, qty: partner.qty }] : [];
 }
 
 export function blogQuantityFor(a: BlogAssignment, writerId: string): number {

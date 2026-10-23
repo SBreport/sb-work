@@ -16,7 +16,7 @@ try {
   const require = createRequire(import.meta.url);
   const { buildCsvExportUrl, detectSheetPeriod } = require(join(dir, 'sheet-period.cjs'));
   const { parseCSVRows, importCsvForMonth } = require(join(dir, 'csv-import.cjs'));
-  const { workRolesFor, summarizeWork, isBranding, assignmentWriterFilter, assignmentWorkLabels, blogQuantityFor } = require(join(dir, 'blog-assignment.cjs'));
+  const { workRolesFor, summarizeWork, isBranding, assignmentWriterFilter, assignmentWorkLabels, blogQuantityFor, assignmentPartnersFor } = require(join(dir, 'blog-assignment.cjs'));
   const { calcWriterStats, totalQty } = require(join(dir, 'stats.cjs'));
   const header = ['갱신월','갱신일','과목/병원명','지점명','N 정보성','수량','N 임상/논문','수량','비고','블로그 총 수량','SEO 컨텐츠','비고','수량','최적배포','수량','인블','구분','연결','진행여부','패키지'];
   const row = ['11월','1일','피부과, 유앤아이','테스트','A',6,'B',2,'메모',8,'B','SEO 메모',8,'C',10,8,'직','','','브랜딩'];
@@ -153,6 +153,23 @@ try {
   assert.equal(brandingStats.workQty['SEO 콘텐츠'],8);
   assert.equal(totalQty(brandingStats),16);
   console.log('PASS: November package labels, blank/non-branding packages, separate/shared writers, dashboard categories and October review compatibility');
+  const sharedBranch = {month:'2026-11',package_name:null,main_writer_id:'oh',main_writer_name:'오희진',main_quantity:2,
+    sub_writer_id:'cho',sub_writer_name:'조하영',sub_quantity:6,optimal_writer_id:'other',optimal_writer_name:'최적 담당',optimal_quantity:8};
+  assert.deepEqual(assignmentPartnersFor(sharedBranch,'cho'),[{name:'오희진',role:'블로그(임상/논문)',qty:2}]);
+  assert.deepEqual(assignmentPartnersFor(sharedBranch,'oh'),[{name:'조하영',role:'블로그(정보성)',qty:6}]);
+  assert.deepEqual(assignmentPartnersFor({...sharedBranch,main_writer_name:'이선주',main_writer_id:'lee'},'cho'),[{name:'이선주',role:'블로그(임상/논문)',qty:2}]);
+  assert.deepEqual(assignmentPartnersFor({...sharedBranch,package_name:'브랜딩'},'cho'),[{name:'오희진',role:'네이버 블로그',qty:2}]);
+  assert.deepEqual(assignmentPartnersFor({...sharedBranch,package_name:'브랜딩'},'oh'),[{name:'조하영',role:'SEO 콘텐츠',qty:6}]);
+  assert.deepEqual(assignmentPartnersFor({...sharedBranch,main_writer_id:'cho',main_writer_name:'조하영'},'cho'),[]);
+  assert.deepEqual(assignmentPartnersFor({...sharedBranch,main_quantity:0},'cho'),[]);
+  assert.deepEqual(assignmentPartnersFor({...sharedBranch,main_writer_id:null,main_writer_name:null},'cho'),[]);
+  assert.deepEqual(assignmentPartnersFor({...sharedBranch,main_writer_id:null},'cho'),[{name:'오희진',role:'블로그(임상/논문)',qty:2}]);
+  assert.deepEqual(assignmentPartnersFor(sharedBranch,'other'),[]);
+  assert.deepEqual(assignmentPartnersFor(sharedBranch,''),[]);
+  assert.deepEqual(assignmentPartnersFor({...sharedBranch,month:'2026-10'},'cho'),[{name:'오희진',role:'사수',qty:2}]);
+  assert.deepEqual(assignmentPartnersFor(split,'B'),[{name:'A',role:'네이버 블로그',qty:6}]);
+  assert.equal(summarizeWork([sharedBranch],'cho').total,6);
+  console.log('PASS: paired authors, branding roles, self exclusion, unassigned/zero quantities, legacy months and partner quantities independent of own totals');
   const unifiedHeaders = ['갱신월','갱신일','과목/병원명','지점명','네이버 블로그','비고','블로그 총 수량',
     'SEO 컨텐츠','비고','수량','최적배포','수량','인블','구분','연결','진행여부','패키지'];
   const unifiedRow = ['11월','1일','피부과','테스트','A','블로그 메모',8,'B','SEO 메모',5,'C',10,8,'직','','','브랜딩'];

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { assignmentWriterFilter, isBranding, usesPackageWorkTypes, summarizeWork, workRolesFor } from '@/lib/blog-assignment';
+import { assignmentWriterFilter, assignmentPartnersFor, type AssignmentPartner, isBranding, usesPackageWorkTypes, summarizeWork, workRolesFor } from '@/lib/blog-assignment';
 import { useAuth } from '@/lib/auth-context';
 import { getCurrentMonth, getAdjacentMonth, shortMonthLabel } from '@/lib/date';
 import MonthSelector from '@/components/MonthSelector';
@@ -26,6 +26,7 @@ interface MyAssignment extends Assignment {
   totalQty: number;
   partnerName: string | null;
   partnerRole: string | null; // '사수' or '부사수'
+  partners: AssignmentPartner[];
   isNew: boolean; // 전월에 없던 신규 지점
 }
 
@@ -237,22 +238,14 @@ export default function FreelancerPage() {
       .filter(a => a.main_writer_id === uid || a.sub_writer_id === uid || a.optimal_writer_id === uid || a.inbl_writer_id === uid || a.clinical_writer_id === uid)
       .map(a => {
         const roles = workRolesFor(a, uid);
-        let partnerName: string | null = null;
-        let partnerRole: string | null = null;
-        if (!usesPackageWorkTypes(a)) {
-          if (a.main_writer_id === uid && a.sub_writer_id !== uid) {
-            partnerName = (a.sub_writer as { name: string } | undefined)?.name || a.sub_writer_name || null;
-            partnerRole = ROLE.SUB;
-          } else if (a.sub_writer_id === uid && a.main_writer_id !== uid) {
-            partnerName = (a.main_writer as { name: string } | undefined)?.name || a.main_writer_name || null;
-            partnerRole = '사수';
-          }
-        }
+        const partners = assignmentPartnersFor(a, uid);
+        const partnerName = partners[0]?.name || null;
+        const partnerRole = partners[0]?.role || null;
 
         const totalQty = roles.reduce((s, r) => s + r.qty, 0);
         // 전월에 내가 담당하지 않았던 지점이면 '신규'
         const isNew = prevBranchIds.size > 0 && !prevBranchIds.has(a.branch_id);
-        return { ...a, roles, totalQty, partnerName, partnerRole, isNew };
+        return { ...a, roles, totalQty, partnerName, partnerRole, partners, isNew };
       });
   }, [assignments, uid, prevBranchIds]);
 
@@ -319,6 +312,7 @@ export default function FreelancerPage() {
     const partners: Record<string, { name: string; role: string; count: number; qty: number }> = {};
     let bothCount = 0;
     for (const a of myAssignments) {
+      if (usesPackageWorkTypes(a)) continue;
       if (!usesPackageWorkTypes(a) && a.main_writer_id === uid && a.sub_writer_id === uid) { bothCount++; continue; }
       if (a.partnerName && a.partnerRole) {
         const key = `${a.partnerName}-${a.partnerRole}`;
@@ -354,7 +348,7 @@ export default function FreelancerPage() {
 
   // 파트너별 색상 매핑 (이름 가나다순으로 팔레트 순환 배정)
   const partnerColorMap = useMemo(() => {
-    const names = [...new Set(myAssignments.map(a => a.partnerName).filter(Boolean))].sort();
+    const names = [...new Set(myAssignments.flatMap(a => a.partners.map(p => p.name)))].sort();
     const map: Record<string, typeof PARTNER_COLORS[0]> = {};
     names.forEach((name, i) => { map[name!] = PARTNER_COLORS[i % PARTNER_COLORS.length]; });
     return map;
@@ -362,21 +356,22 @@ export default function FreelancerPage() {
 
   // 파트너 표시 (색상 구분 적용)
   const renderPartner = (a: MyAssignment) => {
-    if (!a.partnerName || !a.partnerRole) return <span className="text-gray-300">-</span>;
-    const color = partnerColorMap[a.partnerName];
-    if (!color) {
-      return (
-        <span className="text-xs">
-          <span className="text-gray-400">{a.partnerRole}</span>{' '}
-          <span className="font-medium text-gray-700">{a.partnerName}</span>
-        </span>
-      );
-    }
+    if (a.partners.length === 0) return <span className="text-gray-300">-</span>;
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${color.bg} ${color.text} ${color.border}`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />
-        {a.partnerName}
-      </span>
+      <div className="space-y-1 text-left">
+        {a.partners.map((partner, index) => {
+          const color = partnerColorMap[partner.name];
+          return (
+            <div key={`${partner.name}-${partner.role}-${index}`}>
+              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${color ? `${color.bg} ${color.text} ${color.border}` : 'bg-gray-50 text-gray-700 border-gray-200'}`}>
+                {color && <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />}
+                {partner.name}
+              </span>
+              <p className="mt-0.5 text-[11px] text-gray-500">{partner.role} {partner.qty}건</p>
+            </div>
+          );
+        })}
+      </div>
     );
   };
 
@@ -719,7 +714,6 @@ export default function FreelancerPage() {
                       ) : (
                         <SortHeader label={hasPackageWorkTypes ? "내 업무·수량" : "포스팅"} sortKeyName="qty" className="text-center w-16" />
                       )}
-                      <th className="px-2 py-2 font-medium text-gray-500 text-xs whitespace-nowrap text-center">진행여부</th>
                       <th className="px-3 py-2 text-left font-medium text-gray-500 text-xs whitespace-nowrap">함께하는 담당자</th>
                     </tr>
                   </thead>
@@ -739,6 +733,7 @@ export default function FreelancerPage() {
                           <td className="px-2 py-1.5 font-medium text-gray-900 whitespace-nowrap">
                             {a.branch?.name || '-'}
                             {isBranding(a) && <span className="ml-1 text-[10px] text-blue-600">브랜딩</span>}
+                            {a.status !== 'active' && <span className="ml-1.5 align-middle"><StatusBadge status={a.status} /></span>}
                             {a.isNew && a.status !== 'new' && <span className="ml-1.5 px-1.5 py-0.5 bg-orange-100 text-orange-600 border border-orange-200 rounded text-[10px] font-semibold">신규 배정</span>}
                           </td>
                           {isReviewer ? (
@@ -772,11 +767,6 @@ export default function FreelancerPage() {
                               )}
                             </td>
                           )}
-                          <td className="px-2 py-1.5 text-center">
-                            {a.status !== 'active'
-                              ? <StatusBadge status={a.status} />
-                              : <span className="text-[11px] text-gray-400">진행</span>}
-                          </td>
                           <td className="px-3 py-1.5">{renderPartner(a)}</td>
                         </tr>
                       );

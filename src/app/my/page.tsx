@@ -9,6 +9,7 @@ import MonthSelector from '@/components/MonthSelector';
 import type { Assignment } from '@/types/database';
 import NoticeBoard from '@/components/NoticeBoard';
 import StatusBadge from '@/components/StatusBadge';
+import WorkRoleList, { WORK_ROLE_STYLES } from '@/components/WorkRoleList';
 import { Briefcase, ChevronUp, ChevronDown, LayoutList, LayoutGrid } from 'lucide-react';
 function clean(val: string | null | undefined): string {
   return (val || '').replace(/,/g, '').trim();
@@ -527,8 +528,8 @@ export default function FreelancerPage() {
                   {otherRoles.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {otherRoles.map(r => (
-                        <span key={r.label} className={`text-[10px] ${r.color}`}>
-                          {r.label} {r.qty}
+                        <span key={r.label} className={`text-[10px] ${WORK_ROLE_STYLES[r.label] ? `rounded border px-1.5 py-0.5 ${WORK_ROLE_STYLES[r.label].className}` : r.color}`}>
+                          {WORK_ROLE_STYLES[r.label]?.label || r.label} {r.qty}
                         </span>
                       ))}
                     </div>
@@ -584,8 +585,8 @@ export default function FreelancerPage() {
                 </div>
                 <div className="flex items-center gap-1 flex-wrap justify-end">
                   {activeRoles.map(r => (
-                    <span key={r.label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${ROLE_PILL[r.label] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                      {r.label} <span className="font-bold">{r.qty}</span>
+                    <span key={r.label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${WORK_ROLE_STYLES[r.label]?.className || ROLE_PILL[r.label] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                      {WORK_ROLE_STYLES[r.label]?.label || r.label} <span className="font-bold tabular-nums">{r.qty}</span>
                     </span>
                   ))}
                 </div>
@@ -755,9 +756,7 @@ export default function FreelancerPage() {
                           ) : (
                             <td className="px-2 py-1.5 text-center">
                               {usesPackageWorkTypes(a) ? (
-                                <div className="space-y-1 text-left min-w-36">
-                                  {a.roles.map(role => <div key={role.label} className="text-xs whitespace-nowrap">{role.label} <strong>{role.qty}건</strong></div>)}
-                                </div>
+                                <WorkRoleList roles={a.roles} />
                               ) : a.totalQty > 0 ? (
                                 <div><span className="font-bold text-sm text-gray-900">{a.totalQty}</span>{hasPackageWorkTypes && a.roles.map(r => <p key={r.label} className="text-xs text-gray-500">{r.label} {r.qty}건</p>)}</div>
                               ) : (
@@ -811,14 +810,14 @@ export default function FreelancerPage() {
                         </div>
                       </div>
                       {/* 하단: 역할 + 담당자 */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-wrap gap-1">
+                      <div className="flex items-start justify-between gap-3">
+                        {usesPackageWorkTypes(a) ? <WorkRoleList roles={a.roles} /> : <div className="flex flex-wrap gap-1">
                           {a.roles.map(r => (
                             <span key={r.label} className={`px-2 py-0.5 rounded text-xs font-medium ${ROLE_TAG[r.label] || 'bg-gray-100 text-gray-600'}`}>
                               {r.label} {r.qty}건
                             </span>
                           ))}
-                        </div>
+                        </div>}
                         {a.partnerName && a.partnerRole && renderPartner(a)}
                       </div>
                     </div>

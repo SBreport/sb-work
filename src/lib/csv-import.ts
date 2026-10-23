@@ -177,9 +177,13 @@ export function parseCSV(text: string): string[][] {
  * 네이버 블로그 통합(v4), 유형별 배정(v3), 구분 열 양식(v2), 기존 양식(v1)을 판별
  * - v2: 헤더에 "구분" 있음 (N열 근처)
  */
+const UNIFIED_MAIN_HEADERS = ['네이버 블로그', '블로그/논문&임상'];
+const UNIFIED_SUB_HEADERS = ['SEO 컨텐츠', 'SEO 콘텐츠', 'SEO/정보성'];
+
 export function detectFormat(headerRow: string[]): ParsedRow['format'] {
   const headers = headerRow.map(h => cleanStr(h));
-  if (headers.includes('네이버 블로그')) return 'v4';
+  if (headers.some(h => UNIFIED_MAIN_HEADERS.includes(h)) || headers.includes('SEO/정보성')
+    || (headers[6] === '블로그 총 수량' && headers[16] === '패키지')) return 'v4';
   if (headers.includes('N 정보성') || headers.includes('N 임상/논문')) return 'v3';
   if (headers.some(h => h === '구분')) return 'v2';
   return 'v1';
@@ -196,7 +200,9 @@ export function parseCSVRows(csvText: string): ParsedRow[] {
     const expected = ['갱신월', '갱신일', '과목/병원명', '지점명', '네이버 블로그', '비고', '블로그 총 수량',
       'SEO 컨텐츠', '비고', '수량', '최적배포', '수량', '인블', '구분', '연결', '진행여부', '패키지'];
     expected.forEach((name, i) => {
-      if (headers[i] !== name && !(i === 7 && headers[i] === 'SEO 콘텐츠')) {
+      const valid = i === 4 ? UNIFIED_MAIN_HEADERS.includes(headers[i])
+        : i === 7 ? UNIFIED_SUB_HEADERS.includes(headers[i]) : headers[i] === name;
+      if (!valid) {
         throw new Error(`통합 양식의 ${String.fromCharCode(65 + i)}열은 '${name}'이어야 합니다.`);
       }
     });
@@ -341,8 +347,12 @@ export async function importCsvForMonth(
       throw new Error('시트의 갱신월과 대상 월이 일치하지 않습니다.');
     }
   }
-  const hasNewFormat = rows.some(r => r.format === 'v3' || r.format === 'v4');
-  if (hasNewFormat) {
+  // 11월 이후에는 헤더 명칭과 무관하게 패키지를 보존하고 월 교체 RPC를 사용한다.
+  const useAtomicReplace = month >= '2026-11';
+  if (useAtomicReplace) {
+    if (rows[0].format !== 'v3' && cleanStr(parseCSV(csvText)[0]?.[16]) !== '패키지') {
+      throw new Error('2026년 11월 이후 양식에는 Q열 패키지가 필요합니다. 기존 배정은 변경하지 않았습니다.');
+    }
     const { error } = await supabase.from('assignments')
       .select('package_name, information_quantity, clinical_writer_id, clinical_writer_name, clinical_quantity').limit(0);
     if (error) throw new Error('새 배정 양식용 DB 마이그레이션을 먼저 적용해주세요. 기존 배정은 변경하지 않았습니다.');
@@ -445,7 +455,7 @@ export async function importCsvForMonth(
     const partnerId = row.connectionName ? (partnerIdMap.get(row.connectionName) || null) : null;
 
     assignments.push({
-      ...(hasNewFormat ? {
+      ...(useAtomicReplace ? {
         package_name: row.packageName || null,
         information_quantity: row.packageName === '브랜딩' ? row.informationQuantity : null,
         clinical_writer_id: row.packageName === '브랜딩' ? writerIdMap.get(row.clinicalWriter) || null : null,
@@ -479,7 +489,7 @@ export async function importCsvForMonth(
     });
   }
 
-  if (hasNewFormat) {
+  if (useAtomicReplace) {
     const { error } = await supabase.rpc('replace_month_assignments', { target_month: month, new_assignments: assignments });
     if (error) throw new Error(`배정 저장 실패: ${error.message}`);
   } else {

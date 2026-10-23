@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { assignmentWriterFilter } from '@/lib/blog-assignment';
+import { eligiblePreviewWriterIds, PREVIEW_WORK_START_MONTH } from '@/lib/preview-visibility';
 import {
   LayoutDashboard,
   ClipboardList,
@@ -32,9 +33,9 @@ const PasswordChangeModal = dynamic(() => import('./PasswordChangeModal'), { ssr
 // ── 공통 메뉴: 모든 로그인 사용자 ──
 const commonMenuItems = [
   { href: '/notices', label: '공지사항', icon: Megaphone },
-  { href: '/organization', label: '조직도', icon: Network },
-  { href: '/partners', label: '협력사', icon: Handshake },
-  { href: '/library', label: '자료실', icon: FolderOpen },
+  { href: '/organization', label: '조직도', icon: Network, hidden: true },
+  { href: '/partners', label: '협력사', icon: Handshake, hidden: true },
+  { href: '/library', label: '자료실', icon: FolderOpen, hidden: true },
 ];
 
 // ── 프리랜서 전용 ──
@@ -45,11 +46,11 @@ const freelancerExtraItems = [
 // ── 관리 하위 메뉴 (접힘/열림) ──
 const adminSubItems = [
   { href: '/admin/notices', label: '공지사항 관리', icon: Megaphone },
-  { href: '/admin/organization', label: '조직도 수정', icon: Network },
+  { href: '/admin/organization', label: '조직도 수정', icon: Network, hidden: true },
   { href: '/admin/assignments', label: '블로그 업무 배정', icon: ClipboardList },
   { href: '/admin/writers', label: '계정 관리', icon: Users },
-  { href: '/admin/branches', label: '지점 현황', icon: Building2 },
-  { href: '/admin/partners', label: '협력사 관리', icon: Handshake },
+  { href: '/admin/branches', label: '지점 현황', icon: Building2, hidden: true },
+  { href: '/admin/partners', label: '협력사 관리', icon: Handshake, hidden: true },
   { href: '/admin/import', label: '데이터 가져오기', icon: FileUp },
 ];
 
@@ -68,6 +69,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const { profile, signOut, isAdmin, isEditor, isEmployee, viewAsId, viewAsProfile, viewAsRole, setViewAs, isViewingAs } = useAuth();
   const [writers, setWriters] = useState<WriterOption[]>([]);
   const [employees, setEmployees] = useState<WriterOption[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
   // 관리 하위메뉴
   const [managementOpen, setManagementOpen] = useState(false);
   // 미리보기 하위메뉴
@@ -91,29 +94,43 @@ export default function Sidebar({ onClose }: SidebarProps) {
 
   // 현재 관리 페이지에 있으면 자동으로 열기
   useEffect(() => {
-    const isOnAdminSub = adminSubItems.some(item => pathname.startsWith(item.href));
+    const isOnAdminSub = adminSubItems.some(item => !item.hidden && pathname.startsWith(item.href));
     if (isOnAdminSub) setManagementOpen(true);
   }, [pathname]);
 
-  // 관리자일 때 프리랜서 + 직원 목록 로드 (한 번만)
+  // 미리보기에서만 2026년 8월 이후 실제 배정 수량이 있는 활성 계정을 표시한다.
   const listsFetched = useRef(false);
   useEffect(() => {
     if (!isAdmin || listsFetched.current) return;
     listsFetched.current = true;
-    supabase
-      .from('profiles')
-      .select('id, name')
-      .eq('role', 'freelancer')
-      .eq('is_active', true)
-      .order('name')
-      .then(({ data }) => setWriters(data || []));
-    supabase
-      .from('profiles')
-      .select('id, name')
-      .eq('role', 'employee')
-      .eq('is_active', true)
-      .order('name')
-      .then(({ data }) => setEmployees(data || []));
+    setPreviewLoading(true);
+    setPreviewError('');
+    const loadEligibleIds = async () => {
+      const ids = new Set<string>();
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await supabase.from('assignments')
+          .select('month, package_name, main_writer_id, main_quantity, sub_writer_id, sub_quantity, optimal_writer_id, optimal_quantity, inbl_writer_id, inbl_quantity, information_quantity, clinical_writer_id, clinical_quantity')
+          .gte('month', PREVIEW_WORK_START_MONTH)
+          .order('id')
+          .range(offset, offset + 999);
+        if (error) throw error;
+        for (const id of eligiblePreviewWriterIds(data || [])) ids.add(id);
+        if ((data?.length || 0) < 1000) return ids;
+      }
+    };
+    Promise.all([
+      supabase.from('profiles').select('id, name, role').in('role', ['freelancer', 'employee'])
+        .eq('is_active', true).order('name'),
+      loadEligibleIds(),
+    ]).then(([{ data, error }, eligibleIds]) => {
+      if (error) throw error;
+      const visible = (data || []).filter(writer => eligibleIds.has(writer.id));
+      setWriters(visible.filter(writer => writer.role === 'freelancer'));
+      setEmployees(visible.filter(writer => writer.role === 'employee'));
+    }).catch(() => {
+      listsFetched.current = false;
+      setPreviewError('미리보기 명단을 불러오지 못했습니다. 새로고침해 주세요.');
+    }).finally(() => setPreviewLoading(false));
   }, [isAdmin]);
 
   // 직원/직원 미리보기의 배정 유무 확인 → '내 업무' 메뉴 노출 판단
@@ -224,6 +241,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
           const hideFromFreelancer = isFreelancer || (isInViewMode && viewAsRole === 'freelancer');
           const FREELANCER_HIDDEN = ['/organization', '/clients', '/partners'];
           return commonMenuItems
+            .filter(item => !item.hidden)
             .filter(item => !hideFromFreelancer || !FREELANCER_HIDDEN.includes(item.href))
             .map(renderMenuItem);
         })()}
@@ -257,7 +275,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
 
             {managementOpen && (
               <div className="ml-4 pl-3 border-l-2 border-gray-100 space-y-0.5">
-                {adminSubItems.map(item => {
+                {adminSubItems.filter(item => !item.hidden).map(item => {
                   const isActive = pathname.startsWith(item.href);
                   const Icon = item.icon;
                   return (
@@ -297,6 +315,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
 
             {previewOpen && (
               <div className="ml-4 pl-3 border-l-2 border-gray-100 space-y-0.5 mt-1">
+                {previewError && <p role="alert" className="px-2.5 py-2 text-xs text-red-600">{previewError}</p>}
                 {/* 프리랜서 미리보기 */}
                 <button
                   onClick={() => { setShowFreelancerList(!showFreelancerList); setShowEmployeeList(false); }}
@@ -318,8 +337,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
                         {w.name}
                       </button>
                     ))}
-                    {writers.length === 0 && (
-                      <p className="px-3 py-2 text-xs text-gray-400">등록된 프리랜서가 없습니다.</p>
+                    {writers.length === 0 && !previewError && (
+                      <p className="px-3 py-2 text-xs text-gray-400">{previewLoading ? '명단을 불러오는 중...' : '2026년 8월 이후 배정된 프리랜서가 없습니다.'}</p>
                     )}
                   </div>
                 )}
@@ -345,8 +364,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
                         {e.name}
                       </button>
                     ))}
-                    {employees.length === 0 && (
-                      <p className="px-3 py-2 text-xs text-gray-400">등록된 직원이 없습니다.</p>
+                    {employees.length === 0 && !previewError && (
+                      <p className="px-3 py-2 text-xs text-gray-400">{previewLoading ? '명단을 불러오는 중...' : '2026년 8월 이후 배정된 직원이 없습니다.'}</p>
                     )}
                   </div>
                 )}

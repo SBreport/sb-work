@@ -675,10 +675,12 @@ export default function AssignmentsPage() {
                   ) => {
                     if (isEditor || (role === 'main' && isBranding(a))) {
                       return (
-                        <span
-                          className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${writerName ? colorClass : ''}`}
-                        >
-                          {writerName || '-'}
+                        <span className="inline-block rounded px-1.5 py-1">
+                          <span
+                            className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${writerName ? colorClass : ''}`}
+                          >
+                            {writerName || '-'}
+                          </span>
                         </span>
                       );
                     }
@@ -739,7 +741,7 @@ export default function AssignmentsPage() {
                             </div>
                             <div className="text-blue-600 font-semibold text-right shrink-0 w-8">
                               {isEditor || isBranding(a) ? (
-                                <span>{a.main_quantity}</span>
+                                <span className="inline-block min-w-[2rem] px-1.5 py-1">{a.main_quantity}</span>
                               ) : (
                                 <InlineEditCell
                                   value={a.main_quantity}
@@ -761,7 +763,7 @@ export default function AssignmentsPage() {
                           </div>
                           <div className="text-green-600 font-semibold text-right shrink-0 w-8">
                             {isEditor ? (
-                              <span>{a.sub_quantity}</span>
+                              <span className="inline-block min-w-[2rem] px-1.5 py-1">{a.sub_quantity}</span>
                             ) : (
                               <InlineEditCell
                                 value={a.sub_quantity}
@@ -781,7 +783,7 @@ export default function AssignmentsPage() {
                           </div>
                           <div className="text-purple-600 font-semibold text-right shrink-0 w-8">
                             {isEditor ? (
-                              <span>{a.optimal_quantity}</span>
+                              <span className="inline-block min-w-[2rem] px-1.5 py-1">{a.optimal_quantity}</span>
                             ) : (
                               <InlineEditCell
                                 value={a.optimal_quantity}
@@ -801,7 +803,7 @@ export default function AssignmentsPage() {
                           </div>
                           <div className="text-amber-600 font-semibold text-right shrink-0 w-8">
                             {isEditor ? (
-                              <span>{a.inbl_quantity}</span>
+                              <span className="inline-block min-w-[2rem] px-1.5 py-1">{a.inbl_quantity}</span>
                             ) : (
                               <InlineEditCell
                                 value={a.inbl_quantity}

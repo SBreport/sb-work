@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { assignmentWriterFilter } from '@/lib/blog-assignment';
 import { eligiblePreviewWriterIds, PREVIEW_WORK_START_MONTH } from '@/lib/preview-visibility';
+import { writerAffiliation } from '@/lib/writer-affiliation';
 import {
   LayoutDashboard,
   ClipboardList,
@@ -119,14 +120,14 @@ export default function Sidebar({ onClose }: SidebarProps) {
       }
     };
     Promise.all([
-      supabase.from('profiles').select('id, name, role').in('role', ['freelancer', 'employee'])
+      supabase.from('profiles').select('id, name, role, employee_type')
         .eq('is_active', true).order('name'),
       loadEligibleIds(),
     ]).then(([{ data, error }, eligibleIds]) => {
       if (error) throw error;
       const visible = (data || []).filter(writer => eligibleIds.has(writer.id));
-      setWriters(visible.filter(writer => writer.role === 'freelancer'));
-      setEmployees(visible.filter(writer => writer.role === 'employee'));
+      setWriters(visible.filter(writer => writerAffiliation(writer) === 'freelancer'));
+      setEmployees(visible.filter(writer => writerAffiliation(writer) === 'employee'));
     }).catch(() => {
       listsFetched.current = false;
       setPreviewError('미리보기 명단을 불러오지 못했습니다. 새로고침해 주세요.');

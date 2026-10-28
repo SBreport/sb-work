@@ -673,7 +673,7 @@ export default function AssignmentsPage() {
                     writerId: string,
                     role: string
                   ) => {
-                    if (isEditor) {
+                    if (isEditor || (role === 'main' && isBranding(a))) {
                       return (
                         <span
                           className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${writerName ? colorClass : ''}`}
@@ -725,15 +725,11 @@ export default function AssignmentsPage() {
                       <td className="px-2 py-1.5 font-medium text-gray-900">{a.branch?.name}{isBranding(a) && <span className="ml-1 text-xs text-blue-600">브랜딩</span>}</td>
                       {/* 사수 */}
                       <td className="px-2 py-1.5 whitespace-nowrap">
-                        {isBranding(a) ? (
+                        {isBranding(a) && (a.information_quantity != null || a.clinical_quantity != null) ? (
                           <div className="text-xs space-y-1">
-                            {a.information_quantity == null && a.clinical_quantity == null ? (
-                              <p>{main.writerName || '미배정'} · 네이버 블로그 {a.main_quantity}건</p>
-                            ) : <>
-                              <p>정보형 {main.writerName || '미배정'} {a.information_quantity ?? 0}건</p>
-                              <p>임상/논문형 {a.clinical_writer_name || '미배정'} {a.clinical_quantity ?? 0}건</p>
-                              <p className="text-gray-400">블로그 총 {a.main_quantity}건 · 시트에서 수정</p>
-                            </>}
+                            <p>정보형 {main.writerName || '미배정'} {a.information_quantity ?? 0}건</p>
+                            <p>임상/논문형 {a.clinical_writer_name || '미배정'} {a.clinical_quantity ?? 0}건</p>
+                            <p className="text-gray-400">블로그 총 {a.main_quantity}건 · 시트에서 수정</p>
                           </div>
                         ) : <div>
                           {usesPackageWorkTypes(a) && <p className="text-[10px] text-gray-500 mb-1">{assignmentWorkLabels(a)[0]}</p>}
@@ -742,7 +738,7 @@ export default function AssignmentsPage() {
                               {renderWriterCell(main.writerName, main.colorClass, a.main_writer_id || '', 'main')}
                             </div>
                             <div className="text-blue-600 font-semibold text-right shrink-0 w-8">
-                              {isEditor ? (
+                              {isEditor || isBranding(a) ? (
                                 <span>{a.main_quantity}</span>
                               ) : (
                                 <InlineEditCell

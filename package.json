@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "schema:inspect": "node scripts/inspect-supabase-schema.mjs",
     "test:branding": "node scripts/check-branding.mjs"
   },
   "dependencies": {

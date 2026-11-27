@@ -75,7 +75,7 @@ export default function AdminSurveysPage() {
   const create = async () => {
     setMessage('');
     if (await call('/api/surveys', { method: 'POST', body: JSON.stringify({ branchId, nasUrl }) })) {
-      setMessage('링크 두 개를 만들었습니다. 아래 목록에서 복사하세요.');
+      setMessage('원장용·실장용 링크를 만들었습니다. 아래 목록에서 복사하세요.');
       setNasUrl('');
       setBranchId('');
       setBranchQuery('');
@@ -200,7 +200,7 @@ export default function AdminSurveysPage() {
           <input className={`${INPUT} w-full`} type="url" placeholder="https://" value={nasUrl} onChange={e => setNasUrl(e.target.value)} />
         </label>
         <button type="button" disabled={!branchId} onClick={create} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">
-          링크 두 개 만들기
+          링크 만들기
         </button>
       </section>
 

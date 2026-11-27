@@ -175,16 +175,16 @@ export default function AdminSurveysPage() {
       {message && <p className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800" role="status">{message}</p>}
 
       <section className="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4">
-        <label className="text-sm text-gray-700">
+        <label className="relative text-sm text-gray-700">
           <span className="mb-1 block text-xs text-gray-500">지점</span>
           <input className={`${INPUT} w-64`} type="search" placeholder="지점 이름 일부를 입력" autoComplete="off" value={branchQuery}
             onChange={e => { setBranchQuery(e.target.value); setBranchId(''); }} />
-          {/* 고르기 전에만 후보를 보여 준다 — 이름 일부가 들어 있는 지점(해지·이미 링크 있는 지점 제외) */}
+          {/* 후보는 입력 칸 아래에 띄운다(자리를 차지하지 않아 틀이 안 움직임). 고르기 전에만 보여 준다 — 이름 일부가 들어 있는 지점(해지·이미 링크 있는 지점 제외) */}
           {branchQuery.trim() && !branchId && (() => {
             const q = branchQuery.trim().toLowerCase();
             const hits = list.branches.filter(b => b.status !== 'terminated' && !byBranch.has(b.id) && b.name.toLowerCase().includes(q));
             return hits.length ? (
-              <ul className="mt-1 max-h-56 w-64 overflow-y-auto rounded-lg border border-gray-200 bg-white">
+              <ul className="absolute left-0 top-full z-20 mt-1 max-h-56 w-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
                 {hits.slice(0, 20).map(b => (
                   <li key={b.id}>
                     <button type="button" className="block w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-blue-50"
@@ -192,7 +192,7 @@ export default function AdminSurveysPage() {
                   </li>
                 ))}
               </ul>
-            ) : <p className="mt-1 text-xs text-gray-500">맞는 지점이 없습니다. 이미 링크를 만든 지점은 아래 목록에 있습니다.</p>;
+            ) : <p className="absolute left-0 top-full z-20 mt-1 w-64 rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-500 shadow-lg">맞는 지점이 없습니다. 이미 링크를 만든 지점은 아래 목록에 있습니다.</p>;
           })()}
         </label>
         <label className="min-w-64 flex-1 text-sm text-gray-700">

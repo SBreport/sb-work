@@ -42,6 +42,7 @@ export default function AdminSurveysPage() {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [secrets, setSecrets] = useState<Record<string, unknown> | null>(null);
   const [message, setMessage] = useState('');
+  const [picked, setPicked] = useState<string[]>([]); // 목록에서 고른 병원(삭제용, admin만)
 
   const call = useCallback(async (url: string, init?: RequestInit) => {
     const res = await authFetch(url, init?.body ? { ...init, headers: { 'Content-Type': 'application/json' } } : init);
@@ -98,10 +99,24 @@ export default function AdminSurveysPage() {
   const remove = async () => {
     if (!detail || !window.confirm(`${detail.branch.name}의 설문 링크·답·계정 정보를 모두 지웁니다. 되돌릴 수 없습니다. 지울까요?`)) return;
     if (await call(`/api/surveys?branch=${detail.branch.id}`, { method: 'DELETE' })) {
+      setPicked(picked.filter(x => x !== detail.branch.id));
       setDetail(null);
       setMessage('지웠습니다.');
       await loadList();
     }
+  };
+
+  const removePicked = async (names: string[]) => {
+    if (!window.confirm(`${names.join(', ')} — ${picked.length}곳의 설문 링크·답·계정 정보를 모두 지웁니다. 되돌릴 수 없습니다. 지울까요?`)) return;
+    let done = 0;
+    for (const id of picked) {
+      if (!(await call(`/api/surveys?branch=${id}`, { method: 'DELETE' }))) break; // 실패하면 멈춘다 — 오류 문구는 call이 띄웠다
+      done += 1;
+    }
+    if (detail && picked.includes(detail.branch.id)) setDetail(null);
+    if (done === picked.length) setMessage(`${done}곳을 지웠습니다.`);
+    setPicked([]);
+    await loadList();
   };
 
   if (!list) return <div className="p-6">{message ? <p className="text-sm text-red-600">{message}</p> : <Spinner />}</div>;
@@ -110,6 +125,8 @@ export default function AdminSurveysPage() {
   for (const l of list.links) byBranch.set(l.branch_id, { ...byBranch.get(l.branch_id), [l.kind]: l });
   const nameOf = (id: string) => list.branches.find(b => b.id === id)?.name ?? '(지워진 지점)';
   const timeOf = (l: Link) => list.times.find(t => t.link_id === l.id);
+  const isAdminOnly = profile?.role === 'admin'; // 삭제 API(requireAdminOnly)와 같은 기준
+  const allIds = [...byBranch.keys()];
   const url = (l: Link) => `${window.location.origin}/survey/${l.token}`;
   // 설문 요청 카톡 — 문구 원본은 sb-marketing-system 「12 카톡문구」의 `설문요청`. 그쪽을 고치면 여기도 같이 고친다.
   const kakao = (branch: string, owner: Link, counsel: Link) => [
@@ -218,15 +235,34 @@ export default function AdminSurveysPage() {
       </section>
 
       <section className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        {isAdminOnly && picked.length > 0 && (
+          <div className="flex items-center gap-3 border-b border-gray-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            <span>{picked.length}곳 선택</span>
+            <button type="button" className={`${BTN} text-red-600`} onClick={() => removePicked(picked.map(nameOf))}>선택 삭제</button>
+            <button type="button" className={BTN} onClick={() => setPicked([])}>선택 풀기</button>
+          </div>
+        )}
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200 text-left text-xs text-gray-500">
+              {isAdminOnly && (
+                <th className="w-8 px-3 py-2">
+                  <input type="checkbox" aria-label="모두 선택" checked={allIds.length > 0 && picked.length === allIds.length}
+                    onChange={e => setPicked(e.target.checked ? allIds : [])} />
+                </th>
+              )}
               <th className="px-3 py-2">병원(지점)</th><th className="px-3 py-2">원장용</th><th className="px-3 py-2">실장용</th><th className="px-3 py-2" />
             </tr>
           </thead>
           <tbody>
             {[...byBranch.entries()].map(([id, pair]) => (
               <tr key={id} className="border-b border-gray-100">
+                {isAdminOnly && (
+                  <td className="px-3 py-2">
+                    <input type="checkbox" aria-label={`${nameOf(id)} 선택`} checked={picked.includes(id)}
+                      onChange={e => setPicked(e.target.checked ? [...picked, id] : picked.filter(x => x !== id))} />
+                  </td>
+                )}
                 <td className="px-3 py-2 text-sm font-medium text-gray-900">{nameOf(id)}</td>
                 {linkCell(pair.owner)}
                 {linkCell(pair.counsel)}
@@ -238,7 +274,7 @@ export default function AdminSurveysPage() {
                 </td>
               </tr>
             ))}
-            {!byBranch.size && <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-gray-500">아직 만든 설문 링크가 없습니다.</td></tr>}
+            {!byBranch.size && <tr><td colSpan={isAdminOnly ? 5 : 4} className="px-3 py-6 text-center text-sm text-gray-500">아직 만든 설문 링크가 없습니다.</td></tr>}
           </tbody>
         </table>
       </section>
@@ -258,7 +294,7 @@ export default function AdminSurveysPage() {
             }}>
               계정 정보 {secrets ? '가리기' : '보기'}
             </button>
-            {profile?.role === 'admin' && <button type="button" className={`${BTN} text-red-600`} onClick={remove}>응답 삭제</button>}
+            {isAdminOnly && <button type="button" className={`${BTN} text-red-600`} onClick={remove}>응답 삭제</button>}
             <button type="button" className={BTN} onClick={() => setDetail(null)}>닫기</button>
           </div>
 

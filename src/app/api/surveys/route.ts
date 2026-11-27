@@ -40,12 +40,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ branches: branches.data, links: links.data, times: times ?? [] }, { headers: noStore });
   }
 
-  const { data: links, error } = await db.from('survey_links').select(LINK_COLS).eq('branch_id', branchId);
+  // 링크와 지점 이름은 서로 기다릴 필요가 없다 — 한꺼번에 보낸다(계정 「보기」에서는 지점 이름을 안 쓴다)
+  const wantSecrets = !!searchParams.get('secrets');
+  const [{ data: links, error }, { data: branch }] = await Promise.all([
+    db.from('survey_links').select(LINK_COLS).eq('branch_id', branchId),
+    wantSecrets ? { data: null } : db.from('branches').select('id, name').eq('id', branchId).maybeSingle(),
+  ]);
   if (error) return fail(error.message, 500);
   const rows = (links ?? []) as LinkRow[];
   const owner = rows.find(l => l.kind === 'owner');
 
-  if (searchParams.get('secrets')) {
+  if (wantSecrets) {
     if (!owner) return NextResponse.json({ secrets: {} }, { headers: noStore });
     const { data } = await db.from('survey_secrets').select('payload').eq('link_id', owner.id).maybeSingle();
     if (data && !hasSecretKey()) return fail('암호화 키(SURVEY_SECRET_KEY)가 서버에 없습니다.', 500);
@@ -57,13 +62,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const [{ data: branch }, { data: answerRows }] = await Promise.all([
-    db.from('branches').select('id, name').eq('id', branchId).maybeSingle(),
-    rows.length
-      ? db.from('survey_answers').select('link_id, answers, saved_at, submitted_at, consent_at').in('link_id', rows.map(l => l.id))
-      : Promise.resolve({ data: [] as { link_id: string; answers: Answers; saved_at: string | null; submitted_at: string | null; consent_at: string | null }[] }),
-  ]);
   if (!branch) return fail('지점을 찾을 수 없습니다.', 404);
+  const { data: answerRows } = rows.length
+    ? await db.from('survey_answers').select('link_id, answers, saved_at, submitted_at, consent_at').in('link_id', rows.map(l => l.id))
+    : { data: [] as { link_id: string; answers: Answers; saved_at: string | null; submitted_at: string | null; consent_at: string | null }[] };
 
   const side = (kind: Kind) => {
     const link = rows.find(l => l.kind === kind);

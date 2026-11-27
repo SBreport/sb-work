@@ -42,6 +42,7 @@ export default function AdminSurveysPage() {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [secrets, setSecrets] = useState<Record<string, unknown> | null>(null);
   const [message, setMessage] = useState('');
+  const [opening, setOpening] = useState(''); // 응답 보기를 누른 병원 이름 — 답이 오기 전에 창부터 띄운다
   const [picked, setPicked] = useState<string[]>([]); // 목록에서 고른 병원(삭제용, admin만)
 
   const call = useCallback(async (url: string, init?: RequestInit) => {
@@ -56,9 +57,11 @@ export default function AdminSurveysPage() {
     if (json) setList(json);
   }, [call]);
 
-  const openDetail = useCallback(async (id: string) => {
+  const openDetail = useCallback(async (id: string, name = '') => {
     setSecrets(null);
+    setOpening(name);
     const json = await call(`/api/surveys?branch=${id}`);
+    setOpening('');
     if (json) setDetail(json);
   }, [call]);
 
@@ -173,7 +176,7 @@ export default function AdminSurveysPage() {
           </span>
           {(side.status === 'submitted' || expired(side.link)) && (
             <button type="button" className={BTN} onClick={() => patch({ linkId: side.link.id, action: 'reopen' })}>
-              {side.status === 'submitted' ? '다시 열기' : '기간 30일 늘리기'}
+              {side.status === 'submitted' ? '수정 허용' : '기간 30일 늘리기'}
             </button>
           )}
           {kind === 'owner' && (
@@ -278,7 +281,7 @@ export default function AdminSurveysPage() {
                   {pair.owner && pair.counsel && (
                     <button type="button" className={BTN} onClick={() => copy(kakao(nameOf(id), pair.owner!, pair.counsel!), '카톡 문구를')}>카톡 문구 복사</button>
                   )}
-                  <button type="button" className={BTN} onClick={() => openDetail(id)}>응답 보기</button>
+                  <button type="button" className={BTN} onClick={() => openDetail(id, nameOf(id))}>응답 보기</button>
                 </td>
               </tr>
             ))}
@@ -287,6 +290,14 @@ export default function AdminSurveysPage() {
         </table>
       </section>
 
+      {opening && !detail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="flex items-center gap-3 rounded-xl bg-white px-6 py-5 text-sm text-gray-700 shadow-xl" role="status">
+            <span className="h-5 w-5 animate-spin rounded-full border-b-2 border-blue-600" aria-hidden="true" />
+            {opening} 응답을 불러오는 중…
+          </div>
+        </div>
+      )}
       {detail && (
         // 응답 보기는 화면 위에 띄운다 — 다른 모달(PasswordChangeModal 등)과 같은 방식. 바깥을 누르거나 Esc로 닫는다
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setDetail(null)}>

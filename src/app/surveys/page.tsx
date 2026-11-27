@@ -302,9 +302,9 @@ export default function AdminSurveysPage() {
         // 응답 보기는 화면 위에 띄운다 — 다른 모달(PasswordChangeModal 등)과 같은 방식. 바깥을 누르거나 Esc로 닫는다
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setDetail(null)}>
         <section role="dialog" aria-modal="true" aria-label={`${detail.branch.name} 설문 응답`}
-          className="max-h-[90vh] w-full max-w-4xl space-y-5 overflow-y-auto rounded-xl border border-gray-200 bg-white p-5 shadow-xl"
+          className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
           onClick={e => e.stopPropagation()}>
-          <div className="sticky top-0 z-10 -mx-5 -mt-5 flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-5 py-3">
+          <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-5 py-3">
             <h2 className="mr-auto text-lg font-bold text-gray-900">{detail.branch.name}</h2>
             <button type="button" className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
               onClick={() => copy(JSON.stringify(detail.export, null, 2), 'JSON을')}>
@@ -320,6 +320,8 @@ export default function AdminSurveysPage() {
             {isAdminOnly && <button type="button" className={`${BTN} text-red-600`} onClick={remove}>응답 삭제</button>}
             <button type="button" className={BTN} onClick={() => setDetail(null)}>닫기</button>
           </div>
+          {/* 머리 줄은 고정, 아래만 스크롤 — sticky를 쓰면 안쪽 여백 틈으로 글자가 비쳤다 */}
+          <div className="space-y-5 overflow-y-auto p-5">
 
           {/* 떠 있는 창이 맨 위 안내 띠를 가리므로 여기서도 보여 준다 */}
           {message && <p className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800" role="status">{message}</p>}
@@ -335,6 +337,7 @@ export default function AdminSurveysPage() {
 
           {sideView('owner', detail.owner, { treatments: treatmentsOf(detail.owner?.answers ?? {}) })}
           {sideView('counsel', detail.counsel, { treatments: treatmentsOf(detail.counsel?.answers ?? {}, 'counsel') })}
+          </div>
         </section>
         </div>
       )}

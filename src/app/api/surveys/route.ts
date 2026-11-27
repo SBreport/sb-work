@@ -49,7 +49,12 @@ export async function GET(request: NextRequest) {
     if (!owner) return NextResponse.json({ secrets: {} }, { headers: noStore });
     const { data } = await db.from('survey_secrets').select('payload').eq('link_id', owner.id).maybeSingle();
     if (data && !hasSecretKey()) return fail('암호화 키(SURVEY_SECRET_KEY)가 서버에 없습니다.', 500);
-    return NextResponse.json({ secrets: data ? decryptJson(data.payload) : {} }, { headers: noStore });
+    try {
+      return NextResponse.json({ secrets: data ? decryptJson(data.payload) : {} }, { headers: noStore });
+    } catch {
+      // 저장할 때와 다른 키로 풀면 인증 태그가 맞지 않아 던진다
+      return fail('계정 정보를 풀 수 없습니다. 서버의 암호화 키(SURVEY_SECRET_KEY)가 저장할 때와 다릅니다.', 500);
+    }
   }
 
   const [{ data: branch }, { data: answerRows }] = await Promise.all([
@@ -129,7 +134,8 @@ export async function PATCH(request: NextRequest) {
       .update({ status: link.status === 'submitted' ? 'draft' : link.status, expires_at: expiryFromNow() })
       .eq('id', linkId);
     if (error) return fail(error.message, 500);
-    await db.from('survey_answers').update({ submitted_at: null }).eq('link_id', linkId);
+    const cleared = await db.from('survey_answers').update({ submitted_at: null }).eq('link_id', linkId);
+    if (cleared.error) return fail(cleared.error.message, 500);
     return NextResponse.json({ ok: true }, { headers: noStore });
   }
 

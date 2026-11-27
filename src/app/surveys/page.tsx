@@ -68,8 +68,13 @@ export default function AdminSurveysPage() {
   }, []);
 
   const copy = async (text: string, what: string) => {
-    await navigator.clipboard.writeText(text);
-    setMessage(`${what} 복사했습니다.`);
+    setMessage(''); // 실패했는데 이전 「복사했습니다」가 남으면 다른 링크를 붙여 보내게 된다
+    try {
+      await navigator.clipboard.writeText(text);
+      setMessage(`${what} 복사했습니다.`);
+    } catch {
+      setMessage(`${what} 복사하지 못했습니다. 이 창을 한 번 누른 뒤 다시 시도해 주세요.`);
+    }
   };
 
   const create = async () => {
@@ -106,6 +111,14 @@ export default function AdminSurveysPage() {
   const nameOf = (id: string) => list.branches.find(b => b.id === id)?.name ?? '(지워진 지점)';
   const timeOf = (l: Link) => list.times.find(t => t.link_id === l.id);
   const url = (l: Link) => `${window.location.origin}/survey/${l.token}`;
+  // 설문 요청 카톡 — 문구 원본은 sb-marketing-system 「12 카톡문구」의 `설문요청`. 그쪽을 고치면 여기도 같이 고친다.
+  const kakao = (branch: string, owner: Link, counsel: Link) => [
+    `원장님, 안녕하세요. ${branch} 마케팅을 맡게 된 ${profile?.name ?? ''}입니다.`,
+    '본격적으로 시작하기 전에 병원을 정확히 이해하려고 사전 설문을 부탁드립니다. 링크는 두 개입니다.',
+    `· 원장님용: ${url(owner)}\n· 상담을 가장 많이 맡으시는 분용(10분 정도): ${url(counsel)}`,
+    "두 설문은 따로 쓰시면 되고 순서는 상관없습니다. 원장님용은 한 번에 다 쓰지 않으셔도 됩니다. 적는 대로 저장되고 같은 링크로 이어서 쓰실 수 있습니다. 모르시는 칸은 '모름'을 골라 주세요.",
+    `계정 정보는 마케팅 업무에만 쓰고, 담당 팀만 열람합니다.${owner.nas_url ? ' 자격증·인증서 같은 자료는 설문 안의 「자료 올리기」로 올려 주시면 됩니다.' : ''} 감사합니다.`,
+  ].join('\n\n');
 
   const linkCell = (l: Link | undefined) => {
     if (!l) return <td className="px-3 py-2 text-sm text-gray-400">없음</td>;
@@ -217,7 +230,12 @@ export default function AdminSurveysPage() {
                 <td className="px-3 py-2 text-sm font-medium text-gray-900">{nameOf(id)}</td>
                 {linkCell(pair.owner)}
                 {linkCell(pair.counsel)}
-                <td className="px-3 py-2 text-right"><button type="button" className={BTN} onClick={() => openDetail(id)}>응답 보기</button></td>
+                <td className="space-x-2 whitespace-nowrap px-3 py-2 text-right">
+                  {pair.owner && pair.counsel && (
+                    <button type="button" className={BTN} onClick={() => copy(kakao(nameOf(id), pair.owner!, pair.counsel!), '카톡 문구를')}>카톡 문구 복사</button>
+                  )}
+                  <button type="button" className={BTN} onClick={() => openDetail(id)}>응답 보기</button>
+                </td>
               </tr>
             ))}
             {!byBranch.size && <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-gray-500">아직 만든 설문 링크가 없습니다.</td></tr>}

@@ -47,12 +47,13 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
   const { db, link, error } = await loadLink(token);
   if (error) return error;
 
-  const [{ data: row }, { data: branch }] = await Promise.all([
+  // 서로 기다릴 필요가 없는 조회는 한꺼번에 보낸다(왕복 한 번 줄임)
+  const [{ data: row }, { data: branch }, secrets] = await Promise.all([
     db.from('survey_answers').select('answers, saved_at, submitted_at').eq('link_id', link.id).maybeSingle(),
     db.from('branches').select('name').eq('id', link.branch_id).maybeSingle(),
+    link.kind === 'owner' ? filledFor(db, link.id) : null,
   ]);
   const answers = (row?.answers ?? {}) as Answers;
-  const secrets = link.kind === 'owner' ? await filledFor(db, link.id) : null;
   // 실장용을 열었는데 5-06이 비어 있으면 원장용 3-01 이름으로 미리 채운다(실장이 고칠 수 있다)
   if (link.kind === 'counsel' && link.status !== 'submitted' && !treatmentsOf(answers, 'counsel').length) {
     const names = await ownerTreatments(db, link);

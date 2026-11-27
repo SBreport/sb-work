@@ -37,6 +37,7 @@ export default function AdminSurveysPage() {
   useEffect(() => { if (!loading && profile && !isStaff) router.replace('/notices'); }, [loading, profile, isStaff, router]);
   const [list, setList] = useState<ListData | null>(null);
   const [branchId, setBranchId] = useState('');
+  const [branchQuery, setBranchQuery] = useState('');
   const [nasUrl, setNasUrl] = useState('');
   const [detail, setDetail] = useState<Detail | null>(null);
   const [secrets, setSecrets] = useState<Record<string, unknown> | null>(null);
@@ -76,6 +77,8 @@ export default function AdminSurveysPage() {
     if (await call('/api/surveys', { method: 'POST', body: JSON.stringify({ branchId, nasUrl }) })) {
       setMessage('링크 두 개를 만들었습니다. 아래 목록에서 복사하세요.');
       setNasUrl('');
+      setBranchId('');
+      setBranchQuery('');
       await loadList();
     }
   };
@@ -174,10 +177,23 @@ export default function AdminSurveysPage() {
       <section className="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4">
         <label className="text-sm text-gray-700">
           <span className="mb-1 block text-xs text-gray-500">지점</span>
-          <select className={INPUT} value={branchId} onChange={e => setBranchId(e.target.value)}>
-            <option value="">지점을 고르세요</option>
-            {list.branches.filter(b => b.status !== 'terminated' && !byBranch.has(b.id)).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
+          <input className={`${INPUT} w-64`} type="search" placeholder="지점 이름 일부를 입력" autoComplete="off" value={branchQuery}
+            onChange={e => { setBranchQuery(e.target.value); setBranchId(''); }} />
+          {/* 고르기 전에만 후보를 보여 준다 — 이름 일부가 들어 있는 지점(해지·이미 링크 있는 지점 제외) */}
+          {branchQuery.trim() && !branchId && (() => {
+            const q = branchQuery.trim().toLowerCase();
+            const hits = list.branches.filter(b => b.status !== 'terminated' && !byBranch.has(b.id) && b.name.toLowerCase().includes(q));
+            return hits.length ? (
+              <ul className="mt-1 max-h-56 w-64 overflow-y-auto rounded-lg border border-gray-200 bg-white">
+                {hits.slice(0, 20).map(b => (
+                  <li key={b.id}>
+                    <button type="button" className="block w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-blue-50"
+                      onClick={() => { setBranchId(b.id); setBranchQuery(b.name); }}>{b.name}</button>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="mt-1 text-xs text-gray-500">맞는 지점이 없습니다. 이미 링크를 만든 지점은 아래 목록에 있습니다.</p>;
+          })()}
         </label>
         <label className="min-w-64 flex-1 text-sm text-gray-700">
           <span className="mb-1 block text-xs text-gray-500">NAS 업로드 주소 (선택 — https:// 로 시작. 비우면 「자료 올리기」 버튼이 숨는다)</span>

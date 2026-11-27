@@ -92,6 +92,18 @@ export async function requireAdmin(request: NextRequest): Promise<{ authorized: 
 }
 
 /**
+ * admin·editor·employee 허용 (병원 사전 설문 — 프리랜서·협력사 제외)
+ */
+export async function requireStaff(request: NextRequest): Promise<{ authorized: true; userId: string } | NextResponse> {
+  const result = await extractAuthUser(request);
+  if (result instanceof NextResponse) return result;
+  if (!['admin', 'editor', 'employee'].includes(result.role)) {
+    return NextResponse.json({ error: '직원 권한이 필요합니다.' }, { status: 403 });
+  }
+  return { authorized: true, userId: result.userId };
+}
+
+/**
  * 순수 admin만 허용 (위험한 API: 데이터 가져오기, 리셋 등)
  */
 export async function requireAdminOnly(request: NextRequest): Promise<{ authorized: true; userId: string } | NextResponse> {

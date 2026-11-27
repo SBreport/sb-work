@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin, requireAdminOnly } from '@/lib/auth-guard';
+import { requireStaff, requireAdminOnly } from '@/lib/auth-guard';
 import { createServerSupabase } from '@/lib/supabase-server';
 import { decryptJson, expiryFromNow, hasSecretKey, newToken, parseNasUrl } from '@/lib/survey-server';
 import { buildExport, type Answers, type Kind, type SurveySide } from '@/lib/survey';
 
-// 병원 사전 설문 — 관리자 API. admin·editor만(requireAdmin). 삭제는 admin만(requireAdminOnly).
+// 병원 사전 설문 — 관리자 API. admin·editor·employee(requireStaff). 삭제는 admin만(requireAdminOnly).
 
 const noStore = { 'Cache-Control': 'no-store' };
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status, headers: noStore });
@@ -21,7 +21,7 @@ const LINK_COLS = 'id, branch_id, kind, token, nas_url, expires_at, status, crea
  * GET /api/surveys?branch=<id>&secrets=1 — 계정 정보(「보기」를 눌렀을 때만 부른다)
  */
 export async function GET(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireStaff(request);
   if (auth instanceof NextResponse) return auth;
   const db = createServerSupabase();
   const { searchParams } = new URL(request.url);
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
 
 /** POST { branchId, nasUrl } — 원장용·실장용 링크를 만든다(이미 있는 종류는 그대로 둔다) */
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireStaff(request);
   if (auth instanceof NextResponse) return auth;
   const { branchId, nasUrl } = await request.json();
   const nas = parseNasUrl(nasUrl);
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
  * PATCH { linkId, action: 'nas', nasUrl }  — NAS 주소 바꾸기
  */
 export async function PATCH(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireStaff(request);
   if (auth instanceof NextResponse) return auth;
   const { linkId, action, nasUrl } = await request.json();
   if (typeof linkId !== 'string' || !linkId) return fail('linkId가 필요합니다.', 400);

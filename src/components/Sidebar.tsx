@@ -26,6 +26,7 @@ import {
   Handshake,
   FolderOpen,
   KeyRound,
+  ClipboardCheck,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -34,6 +35,7 @@ const PasswordChangeModal = dynamic(() => import('./PasswordChangeModal'), { ssr
 // ── 공통 메뉴: 모든 로그인 사용자 ──
 const commonMenuItems = [
   { href: '/notices', label: '공지사항', icon: Megaphone },
+  { href: '/surveys', label: '설문', icon: ClipboardCheck },
   { href: '/organization', label: '조직도', icon: Network, hidden: true },
   { href: '/partners', label: '협력사', icon: Handshake, hidden: true },
   { href: '/library', label: '자료실', icon: FolderOpen, hidden: true },
@@ -240,7 +242,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
         {/* ── 공통 메뉴 ── */}
         {(() => {
           const hideFromFreelancer = isFreelancer || (isInViewMode && viewAsRole === 'freelancer');
-          const FREELANCER_HIDDEN = ['/organization', '/clients', '/partners'];
+          const FREELANCER_HIDDEN = ['/organization', '/clients', '/partners', '/surveys'];
           return commonMenuItems
             .filter(item => !item.hidden)
             .filter(item => !hideFromFreelancer || !FREELANCER_HIDDEN.includes(item.href))

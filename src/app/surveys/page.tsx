@@ -254,7 +254,7 @@ export default function AdminSurveysPage() {
           )}
 
           {sideView('owner', detail.owner, { treatments: treatmentsOf(detail.owner?.answers ?? {}) })}
-          {sideView('counsel', detail.counsel, { treatments: treatmentsOf(detail.owner?.answers ?? {}) })}
+          {sideView('counsel', detail.counsel, { treatments: treatmentsOf(detail.counsel?.answers ?? {}, 'counsel') })}
         </section>
       )}
     </div>

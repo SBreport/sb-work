@@ -27,9 +27,8 @@ async function loadLink(token: string) {
 
 type Db = ReturnType<typeof createServerSupabase>;
 
-/** 실장용은 원장용 답에서 진료 이름(3-01)만 읽는다 */
-async function treatmentsFor(db: Db, link: { id: string; branch_id: string; kind: Kind }, own: Answers): Promise<string[]> {
-  if (link.kind === 'owner') return treatmentsOf(own);
+/** 실장용 5-06의 기본값: 원장용 답에서 진료 이름(3-01)만 읽는다. 원장용의 다른 답은 읽지 않는다 */
+async function ownerTreatments(db: Db, link: { branch_id: string }): Promise<string[]> {
   const { data: ownerLink } = await db.from('survey_links').select('id').eq('branch_id', link.branch_id).eq('kind', 'owner').maybeSingle();
   if (!ownerLink) return [];
   const { data } = await db.from('survey_answers').select('answers').eq('link_id', ownerLink.id).maybeSingle();
@@ -53,10 +52,12 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
     db.from('branches').select('name').eq('id', link.branch_id).maybeSingle(),
   ]);
   const answers = (row?.answers ?? {}) as Answers;
-  const [treatments, secrets] = await Promise.all([
-    treatmentsFor(db, link, answers),
-    link.kind === 'owner' ? filledFor(db, link.id) : null,
-  ]);
+  const secrets = link.kind === 'owner' ? await filledFor(db, link.id) : null;
+  // 실장용을 열었는데 5-06이 비어 있으면 원장용 3-01 이름으로 미리 채운다(실장이 고칠 수 있다)
+  if (link.kind === 'counsel' && link.status !== 'submitted' && !treatmentsOf(answers, 'counsel').length) {
+    const names = await ownerTreatments(db, link);
+    if (names.length) answers['5-06'] = names;
+  }
 
   return NextResponse.json({
     kind: link.kind,
@@ -65,7 +66,6 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
     nasUrl: link.nas_url,
     answers,
     savedAt: row?.saved_at ?? null,
-    treatments,
     secretsFilled: secrets?.filled ?? {}, // 계정 값은 내려보내지 않는다 — 채웠는지만
   }, { headers: noStore });
 }
@@ -119,7 +119,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
   }
 
   if (body.submit) {
-    const treatments = await treatmentsFor(db, link, answers);
+    const treatments = treatmentsOf(answers, link.kind);
     const missing = missingRequired(visibleItems(link.kind, answers, { treatments }, filled));
     if (missing.length) return fail('missing', 400, { ids: [...new Set(missing.map(m => m.q.id))] });
   }

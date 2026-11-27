@@ -8,8 +8,8 @@ import {
 const ids = kind => SURVEYS[kind].pages.flatMap(p => p.questions.map(q => q.id));
 assert.equal(SURVEYS.owner.pages.length, 10);
 assert.equal(ids('owner').length, 84); // 문항 83 + 자료 올리기
-assert.equal(ids('counsel').length, 11);
-assert.equal(new Set([...ids('owner'), ...ids('counsel')]).size, 95, '문항 ID 중복');
+assert.equal(ids('counsel').length, 12);
+assert.equal(new Set([...ids('owner'), ...ids('counsel')]).size, 96, '문항 ID 중복');
 
 const owner = {
   '4-01': true,
@@ -49,15 +49,24 @@ assert.equal(pageStates('owner', items)[0], 'done');
 assert.equal(pageStates('owner', items)[7], 'empty');
 assert.ok(consentGiven('owner', clean) && !consentGiven('counsel', {}));
 
+// 실장용은 자기 5-06 진료 이름으로 답한다 — 원장용이 비어 있어도 혼자 제출할 수 있다
 const counsel = {
   '5-00': { name: '가상실장', title: '상담실장', consent: true },
+  '5-06': ['진료 A', '진료 B', '', '', ''],
   '3-03': { r1: ['진료 B'], r2: [], r3: [], unknown: false, feel: true },
   '3-04': { unknown: true },
   '3-09': '가까워서',
   '5-02': { '진료 A': '가상병원', '없는 진료': 'x' },
 };
-assert.deepEqual(missingRequired(visibleItems('counsel', counsel, ctx)), []);
-assert.ok(missingRequired(visibleItems('counsel', { ...counsel, '5-00': { name: 'a' } }, ctx)).length === 1, '동의 없는 5-00은 미완');
+const cctx = { treatments: treatmentsOf(counsel, 'counsel') };
+assert.deepEqual(cctx.treatments, ['진료 A', '진료 B']);
+assert.deepEqual(missingRequired(visibleItems('counsel', counsel, cctx)), [], '실장 단독 제출: 필수가 다 찼다');
+assert.ok(missingRequired(visibleItems('counsel', { ...counsel, '5-00': { name: 'a' } }, cctx)).length === 1, '동의 없는 5-00은 미완');
+assert.deepEqual(missingRequired(visibleItems('counsel', { ...counsel, '5-06': [] }, { treatments: [] })).map(i => i.q.id), ['5-06'], '5-06이 비면 5-06만 막는다(순위는 모름으로 답함)');
+const solo = buildExport({ id: 'b1', name: 'x' }, null, { status: 'submitted', submittedAt: null, answers: counsel });
+assert.deepEqual(solo.counsel.answers['5-06'], ['진료 A', '진료 B']);
+assert.deepEqual(solo.counsel.answers['3-03'].r1, ['진료 B'], '원장용이 없어도 실장용 순위가 남는다');
+assert.deepEqual(solo.owner.answers, {});
 
 const out = buildExport(
   { id: 'b1', name: '가상의원 가상점' },
@@ -83,6 +92,7 @@ for (const gone of ['2-02', '2-10-2', '3-07-1', '1-01', '1-02', '1-03', '1-04', 
 assert.equal(oa['1-05'], '필요');
 assert.deepEqual(out.counsel.answers['5-00'], { name: '가상실장', title: '상담실장', consent: true });
 assert.deepEqual(out.counsel.answers['3-03'], { r1: ['진료 B'], r2: [], r3: [], unknown: false, feel: true });
+assert.deepEqual(out.counsel.answers['5-06'], ['진료 A', '진료 B']);
 assert.deepEqual(out.counsel.answers['5-02'], { '진료 A': '가상병원' });
 
 const none = buildExport({ id: 'b1', name: 'x' }, null, null);

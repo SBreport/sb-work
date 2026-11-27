@@ -58,7 +58,7 @@ function Cell({ f, value, onChange, disabled }: { f: Field; value: unknown; onCh
   );
 }
 
-const NEED_TREATMENTS = '「진료와 순위」 페이지에서 주요 진료를 먼저 적어주세요.';
+const needTreatments = (ctx: Ctx) => (ctx.kind === 'counsel' ? '위에 주요 진료를 먼저 적어주세요.' : '「진료와 순위」 페이지에서 주요 진료를 먼저 적어주세요.');
 
 export default function SurveyField({ q, value, onChange, answers, ctx, disabled }: Props) {
   switch (q.type) {
@@ -110,7 +110,7 @@ export default function SurveyField({ q, value, onChange, answers, ctx, disabled
     }
 
     case 'pick': {
-      if (!ctx.treatments.length) return <p className="text-sm text-amber-700">{NEED_TREATMENTS}</p>;
+      if (!ctx.treatments.length) return <p className="text-sm text-amber-700">{needTreatments(ctx)}</p>;
       const extras = q.extras ?? [];
       const sel = arr(value);
       const full = !!q.max && sel.filter(x => !extras.includes(x)).length >= q.max;
@@ -131,7 +131,7 @@ export default function SurveyField({ q, value, onChange, answers, ctx, disabled
     }
 
     case 'rank': {
-      if (!ctx.treatments.length) return <p className="text-sm text-amber-700">{NEED_TREATMENTS}</p>;
+      if (!ctx.treatments.length) return <p className="text-sm text-amber-700">{needTreatments(ctx)}</p>;
       const v = isObj(value) ? value : {};
       const ranks = { r1: arr(v.r1), r2: arr(v.r2), r3: arr(v.r3) };
       const set = (patch: Record<string, unknown>) => onChange({ ...ranks, unknown: v.unknown === true, ...(q.feel ? { feel: v.feel === true } : {}), ...patch });

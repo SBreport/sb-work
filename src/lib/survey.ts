@@ -6,9 +6,10 @@ export type Kind = 'owner' | 'counsel';
 export type Answers = Record<string, unknown>;
 export type Req = 'required' | 'recommended';
 
-/** 계산에 필요한 바깥 정보. treatments = 원장용 3-01 진료 목록(실장용은 서버가 원장용 답에서 읽어 준다) */
+/** 계산에 필요한 바깥 정보. treatments = 진료 보기 목록 — 원장용은 3-01, 실장용은 실장 본인이 적은 5-06 */
 export interface Ctx {
   treatments: string[];
+  kind?: Kind;
   nasUrl?: string | null;
 }
 
@@ -72,9 +73,12 @@ function tableRows(v: unknown): Record<string, unknown>[] {
   return v.filter((r): r is Record<string, unknown> => isObj(r) && Object.values(r).some(x => str(x)));
 }
 
-/** 3-01에 적은 진료 이름(빈칸·중복 제거) */
-export function treatmentsOf(a: Answers): string[] {
-  return uniq(strs(a['3-01']));
+/** 진료 이름을 적는 문항: 원장용 3-01, 실장용 5-06. 두 설문은 서로의 목록을 기다리지 않는다 */
+export const treatmentKey = (kind: Kind) => (kind === 'counsel' ? '5-06' : '3-01');
+
+/** 그 설문에 적은 진료 이름(빈칸·중복 제거) */
+export function treatmentsOf(a: Answers, kind: Kind = 'owner'): string[] {
+  return uniq(strs(a[treatmentKey(kind)]));
 }
 
 /** 「의사 여럿」 = 2-09에 한 줄이라도 적혔을 때 */
@@ -392,6 +396,7 @@ const COUNSEL: SurveyDef = {
     {
       title: '환자분들 이야기',
       questions: [
+        { id: '5-06', label: '상담하시는 주요 진료를 5개 이내로 적어주세요. 아래 질문은 이 이름으로 답합니다.', type: 'list', max: 5, req: 'required' },
         { id: '3-03', label: '최근 1년, 처음 오신 분이 가장 많이 찾은 진료 1~3순위', type: 'rank', feel: true, req: 'required' },
         { id: '3-04', label: '다시 오시거나 지인을 소개해 오시는 분이 많은 진료 1~3순위 (둘 중 하나라도)', type: 'rank', req: 'required' },
         { id: '3-04-1', label: '컴플레인이 잦은 진료', type: 'pick', extras: ['없음', '모름'], req: 'recommended' },
@@ -581,11 +586,10 @@ export function toKst(iso: string | null): string | null {
 }
 
 export function buildExport(branch: { id: string; name: string }, owner: SurveySide | null, counsel: SurveySide | null) {
-  const ctx: Ctx = { treatments: treatmentsOf(owner?.answers ?? {}) };
   const side = (kind: Kind, s: SurveySide | null) => ({
     status: s?.status ?? 'none',
     submittedAt: toKst(s?.submittedAt ?? null),
-    answers: s ? exportAnswers(kind, s.answers, ctx) : {},
+    answers: s ? exportAnswers(kind, s.answers, { treatments: treatmentsOf(s.answers, kind) }) : {},
   });
   return { schema: 'sb-survey/1', branch: { id: branch.id, name: branch.name }, owner: side('owner', owner), counsel: side('counsel', counsel) };
 }

@@ -16,7 +16,6 @@ interface Loaded {
   status: 'none' | 'draft' | 'submitted';
   branchName: string;
   nasUrl: string | null;
-  treatments: string[];
 }
 
 const STATE_LABEL: Record<PageState, string> = { empty: '안 씀', partial: '쓰는 중', done: '다 씀' };
@@ -67,7 +66,7 @@ export default function SurveyPage() {
         setAnswers(json.answers ?? {});
         setServerFilled(json.secretsFilled ?? {});
         setSavedAt(json.savedAt);
-        setLoaded({ kind: json.kind, status: json.status, branchName: json.branchName, nasUrl: json.nasUrl, treatments: json.treatments ?? [] });
+        setLoaded({ kind: json.kind, status: json.status, branchName: json.branchName, nasUrl: json.nasUrl });
       })
       .catch(() => alive && setLoadError('network'));
     return () => { alive = false; };
@@ -129,7 +128,8 @@ export default function SurveyPage() {
   }, [save]);
 
   const ctx: Ctx = useMemo(() => ({
-    treatments: loaded?.kind === 'counsel' ? loaded.treatments : treatmentsOf(answers),
+    treatments: treatmentsOf(answers, loaded?.kind),
+    kind: loaded?.kind,
     nasUrl: loaded?.nasUrl,
   }), [loaded, answers]);
 
@@ -224,7 +224,7 @@ export default function SurveyPage() {
       if (!insts.length) {
         out.push(
           <p key={`${q.id}:none`} className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-            {q.repeat === 'confident' ? '위에서 자신 있는 진료를 고르면 그 진료에 대한 질문이 나타납니다.' : '「진료와 순위」 페이지에서 주요 진료를 먼저 적어주세요.'}
+            {q.repeat === 'confident' ? '위에서 자신 있는 진료를 고르면 그 진료에 대한 질문이 나타납니다.' : kind === 'counsel' ? '위에 주요 진료를 먼저 적어주세요.' : '「진료와 순위」 페이지에서 주요 진료를 먼저 적어주세요.'}
           </p>,
         );
         continue;
@@ -274,12 +274,6 @@ export default function SurveyPage() {
       </header>
 
       {submitted && <p className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-800">제출되었습니다. 감사합니다. 고칠 내용이 있으면 담당자에게 알려주세요.</p>}
-      {kind === 'counsel' && !ctx.treatments.length && (
-        <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-          원장님 설문의 주요 진료가 먼저 필요합니다. 원장님이 「진료와 순위」를 적으신 뒤 이 링크를 다시 열어주세요. 그 전에도 글로 적는 문항은 미리 쓰실 수 있습니다.
-        </p>
-      )}
-
       <div className="mt-4 gap-6 md:flex">
         <details className="mb-4 rounded-xl border border-gray-200 bg-white p-2 md:hidden">
           <summary className="cursor-pointer px-2 py-1 text-sm font-medium text-gray-800">목차 — {page + 1}. {def.pages[page].title}</summary>

@@ -27,6 +27,7 @@ import {
   FolderOpen,
   KeyRound,
   ClipboardCheck,
+  CircleDollarSign,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -51,6 +52,7 @@ const adminSubItems = [
   { href: '/admin/notices', label: '공지사항 관리', icon: Megaphone },
   { href: '/admin/organization', label: '조직도 수정', icon: Network, hidden: true },
   { href: '/admin/assignments', label: '블로그 업무 배정', icon: ClipboardList },
+  { href: '/admin/settlement-sample', label: '정산 흐름 샘플', icon: CircleDollarSign },
   { href: '/admin/writers', label: '계정 관리', icon: Users },
   { href: '/admin/branches', label: '지점 현황', icon: Building2, hidden: true },
   { href: '/admin/partners', label: '협력사 관리', icon: Handshake, hidden: true },
@@ -433,4 +435,3 @@ export default function Sidebar({ onClose }: SidebarProps) {
     </aside>
   );
 }
-

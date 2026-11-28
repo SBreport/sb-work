@@ -7,7 +7,8 @@ import {
 
 const ids = kind => SURVEYS[kind].pages.flatMap(p => p.questions.map(q => q.id));
 assert.equal(SURVEYS.owner.pages.length, 10);
-assert.equal(ids('owner').length, 72); // 문항 71 + 자료 올리기
+assert.equal(new Set(ids('owner')).size, 72); // 문항 71 + 자료 올리기
+assert.equal(ids('owner').length, 74, '7-02·7-03만 두 페이지에 있다(자신 있는 진료 / 그 밖 진료)');
 assert.equal(ids('counsel').length, 12);
 assert.equal(new Set([...ids('owner'), ...ids('counsel')]).size, 84, '문항 ID 중복');
 for (const gone of ['2-13', '6-03', '6-06', '7-00', '8-02', '8-03', '8-04', '9-03', '9-05', '9-10', '9-11', '9-12']) assert.ok(!ids('owner').includes(gone), `${gone}은 뺀 문항`);
@@ -104,6 +105,20 @@ const instsOf = id => legacyItems.filter(i => i.q.id === id).map(i => i.inst);
 for (const id of ['7-02', '7-03']) assert.deepEqual(instsOf(id), ['진료 A', '진료 B', '진료 C'], `${id}은 3-01 진료마다, 자신 있는 진료 먼저`);
 for (const id of ['7-01', '7-04', '7-05', '7-06', '7-07', '7-08']) assert.deepEqual(instsOf(id), ['진료 A'], `${id}은 자신 있는 진료만`);
 assert.deepEqual(legacyItems.filter(i => i.q.id === '7-03').map(i => i.req), ['recommended', undefined, undefined], '자신 있는 진료 칸만 권장');
+// 배치: 자신 있는 진료의 7-02·7-03은 「자신 있는 진료」 페이지(3-07-1 뒤, 3-08-a 앞), 그 밖 진료의 것은 「진료별 상세」
+const P = t => SURVEYS.owner.pages.findIndex(p => p.title === t);
+for (const id of ['7-02', '7-03']) {
+  assert.deepEqual(legacyItems.filter(i => i.q.id === id).map(i => [i.page, i.inst]), [[P('자신 있는 진료'), '진료 A'], [P('진료별 상세'), '진료 B'], [P('진료별 상세'), '진료 C']]);
+}
+assert.deepEqual(SURVEYS.owner.pages[P('자신 있는 진료')].questions.filter(q => q.repeat === 'confident').map(q => q.id),
+  ['3-06-1', '3-06-2', '3-07', '3-07-2', '3-07-1', '7-02', '7-03', '3-08-a', '3-08-b', '3-08-c']);
+const q703 = SURVEYS.owner.pages.flatMap(p => p.questions).filter(q => q.id === '7-03').map(q => q.label);
+assert.ok(!q703[0].includes('우리 병원만의 방식') && q703[1].includes('우리 병원만의 방식'), '자신 있는 진료 자리의 7-03은 순서만 묻는다');
+// 모든 진료가 자신 있는 진료면 진료별 상세에 7-02·7-03이 없다. 7-02를 비우면 앞 페이지가 「쓰는 중」
+const two = { ...owner, '3-01': ['진료 A', '진료 B'], '3-06': ['진료 A', '진료 B'], '7-02': { '진료 A': '가상 검사' } };
+const twoItems = visibleItems('owner', two, { treatments: ['진료 A', '진료 B'] }, filled);
+assert.ok(!twoItems.some(i => i.page === P('진료별 상세') && ['7-02', '7-03'].includes(i.q.id)));
+assert.equal(pageStates('owner', twoItems)[P('자신 있는 진료')], 'partial');
 const lo = buildExport({ id: 'b1', name: 'x' }, { status: 'draft', submittedAt: null, answers: legacy }, null).owner.answers;
 for (const gone of ['2-13', '7-00', '9-12', '6-03', '7-04']) assert.ok(!(gone in lo), `${gone}은 JSON에 없다`);
 assert.deepEqual(lo['7-02'], { '진료 A': '가상 검사', '진료 B': '가상 검사 B' }, '7-02는 3-01 진료면 살고, 3-01에 없는 진료는 무시');

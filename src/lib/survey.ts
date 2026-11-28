@@ -39,9 +39,9 @@ export interface Question {
   max?: number;       // pick: 고를 수 있는 수 / list: 칸 수 / table: 줄 수
   feel?: boolean;     // rank: 「체감으로 적음」 체크
   fields?: Field[];   // fields의 칸 / table의 열
-  /** 반복 묶음. treatment=진료마다, treatment-cf=진료마다(자신 있는 진료 먼저), confident=자신 있는 진료마다,
+  /** 반복 묶음. treatment=진료마다, treatment-rest=자신 있는 진료가 아닌 진료마다, confident=자신 있는 진료마다,
    *  doctor=원장마다, doctor-opt=의사 여럿이고 2-11을 골랐을 때만 원장마다 */
-  repeat?: 'treatment' | 'treatment-cf' | 'confident' | 'doctor' | 'doctor-opt';
+  repeat?: 'treatment' | 'treatment-rest' | 'confident' | 'doctor' | 'doctor-opt';
   when?: (a: Answers, ctx: Ctx, inst: string | null) => boolean;
   complete?: (v: unknown) => boolean; // 필수 판정에 「일부만 씀」을 가려야 할 때
   secret?: boolean;   // 계정 정보 — 답 JSON이 아니라 암호화 표에 저장, JSON 복사 제외
@@ -125,6 +125,8 @@ const GOALS: Field[] = [
 const ACCOUNT: Field[] = [{ key: 'id', label: '아이디' }, { key: 'pw', label: '비밀번호', type: 'password' }];
 const includes = (v: unknown, x: string) => strs(v).includes(x);
 const perInst = (a: Answers, id: string, inst: string | null) => (isObj(a[id]) && inst ? (a[id] as Record<string, unknown>)[inst] : undefined);
+const Q702 = '검사·진단은 어떻게 하시나요?';
+const Q703 = '치료·시술은 어떤 순서로 진행되나요?';
 const longs = (list: [string, string][]): Question[] => list.map(([id, label]) => ({ id, label, type: 'long' }));
 
 const OWNER: SurveyDef = {
@@ -247,6 +249,10 @@ const OWNER: SurveyDef = {
           id: '3-07-1', label: '어떤 진료 방법에 대한 발표·논문인지 (한 줄에 하나)', type: 'long', repeat: 'confident',
           when: (a, _c, inst) => includes(perInst(a, '3-07', inst), '학회·학술지 게재(논문·발표)'),
         },
+        // 7-02·7-03은 같은 ID가 두 페이지에 있다: 자신 있는 진료는 여기, 그 밖의 주요 진료는 「진료별 상세」. 답은 한 칸({진료명: 글})에 모인다.
+        { id: '7-02', label: Q702, type: 'long', repeat: 'confident', req: 'recommended' },
+        // 바로 뒤 3-08-a·3-08-b가 「우리만의 방식」을 물으므로 여기서는 순서만 묻는다
+        { id: '7-03', label: Q703, type: 'long', repeat: 'confident', req: 'recommended' },
         { id: '3-08-a', label: '다른 병원과 실제로 다른 점', type: 'long', repeat: 'confident', req: 'recommended' },
         { id: '3-08-b', label: '원장님이 직접 만들거나 고친 방법이 있다면', type: 'long', repeat: 'confident' },
         { id: '3-08-c', label: '지금 이 진료 환자를 더 받으실 수 있나요?', type: 'single', options: ['여유 있음', '빠듯함', '더 받기 어려움'], repeat: 'confident', req: 'recommended' },
@@ -276,17 +282,8 @@ const OWNER: SurveyDef = {
     },
     {
       title: '진료별 상세',
-      note: '콘텐츠를 만들 때 쓰는 재료입니다. 검사·진단과 치료 방법은 주요 진료마다, 나머지는 자신 있는 진료마다 아는 만큼만 적어주세요.',
+      note: '콘텐츠를 만들 때 쓰는 재료입니다. 자신 있는 진료마다 아는 만큼만 적어주세요. 그 밖의 주요 진료는 검사·진단과 치료 방법만 여쭙니다.',
       questions: [
-        // 검사·진단과 치료 방법은 주요 진료(3-01)마다 — 자신 있는 진료 밖에도 그 병원만의 방식이 있을 수 있다.
-        // 자신 있는 진료(3-06)의 칸만 권장이고 먼저 보인다. 화면에서 묶음이 갈라지지 않게 이 둘을 앞에 둔다.
-        ...([
-          ['7-02', '검사·진단은 어떻게 하시나요?'],
-          ['7-03', '치료·시술은 어떤 순서로 진행되나요? 우리 병원만의 방식이 있다면 함께 적어주세요.'],
-        ] as [string, string][]).map(([id, label]): Question => ({
-          id, label, type: 'long', repeat: 'treatment-cf',
-          req: (a, inst) => (inst && includes(a['3-06'], inst) ? 'recommended' : undefined),
-        })),
         ...([
           ['7-01', '주로 어떤 증상이나 고민으로 오시나요?', 'long'],
           ['7-04', '회복 기간과 주의할 점', 'long'],
@@ -297,6 +294,9 @@ const OWNER: SurveyDef = {
         ] as [string, string, 'long' | 'text'][]).map(([id, label, type]): Question => ({
           id, label, type, repeat: 'confident',
         })),
+        // 자신 있는 진료의 7-02·7-03은 「자신 있는 진료」 페이지에서 묻는다. 여기는 3-01에 있지만 3-06에 없는 진료만(없으면 안 나온다).
+        { id: '7-02', label: Q702, type: 'long', repeat: 'treatment-rest' },
+        { id: '7-03', label: `${Q703} 우리 병원만의 방식이 있다면 함께 적어주세요.`, type: 'long', repeat: 'treatment-rest' },
       ],
     },
     {
@@ -421,9 +421,9 @@ export function reqOf(q: Question, a: Answers, inst: string | null): Req | undef
 export function instancesOf(q: Question, a: Answers, ctx: Ctx): string[] | null {
   switch (q.repeat) {
     case 'treatment': return ctx.treatments;
-    case 'treatment-cf': {
+    case 'treatment-rest': {
       const cf = confidentOf(a, ctx);
-      return [...cf, ...ctx.treatments.filter(t => !cf.includes(t))];
+      return ctx.treatments.filter(t => !cf.includes(t));
     }
     case 'confident': return confidentOf(a, ctx);
     case 'doctor': { const d = chosenDoctors(a); return d.length ? d : ['대표원장']; }

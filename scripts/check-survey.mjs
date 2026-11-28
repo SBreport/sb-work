@@ -31,7 +31,7 @@ const owner = {
   '3-07-1': { '진료 A': '안 보여야 함' },
   '3-11': { '진료 A': '멀어도 찾아오는 분이 많다', '진료 B': '모르겠다', '진료 C': '가까워서 오는 분이 많다' },
   '3-12': [{ name: '가상병원', reason: 'r', better: 'b', worse: 'w', extra: 'x' }, {}],
-  '7-02': { '진료 A': '가상 검사', '진료 B': '자신 있는 진료가 아니라 빠져야 함' },
+  '7-02': { '진료 A': '가상 검사', '진료 B': '가상 검사 B', '없는 진료': '3-01에 없어 빠져야 함' },
   '1-01': { id: 'x', pw: 'y' }, // 계정은 답 JSON에 들어오면 안 된다
 };
 const clean = sanitizeAnswers('owner', { ...owner, 'hack': 1 });
@@ -86,7 +86,7 @@ assert.deepEqual(oa['3-06'], ['진료 A']);
 assert.deepEqual(oa['3-07'], { '진료 A': ['전문의 자격', '학회 정회원·임원', '인증받은 장비'] });
 assert.deepEqual(oa['3-11'], owner['3-11']);
 assert.deepEqual(oa['3-12'], [{ name: '가상병원', reason: 'r', better: 'b', worse: 'w' }]);
-assert.deepEqual(oa['7-02'], { '진료 A': '가상 검사' });
+assert.deepEqual(oa['7-02'], { '진료 A': '가상 검사', '진료 B': '가상 검사 B' });
 assert.deepEqual(oa['2-11'], ['대표원장', '김가상']);
 assert.deepEqual(Object.keys(oa['3-05']), ['대표원장', '김가상']);
 for (const gone of ['2-02', '2-10-2', '3-07-1', '1-01', '1-02', '1-03', '1-04', '2-08']) assert.ok(!(gone in oa), `${gone}은 빠져야 한다`);
@@ -100,11 +100,13 @@ assert.deepEqual(out.counsel.answers['5-02'], { '진료 A': '가상병원' });
 const legacy = { ...owner, '2-13': ['진료별 매출'], '7-00': '옛 공통 질문', '9-12': ['진료 A'], '6-03': { 대표원장: '옛 답' }, '7-04': { '진료 C': '옛 답' } };
 const legacyItems = visibleItems('owner', legacy, ctx, filled);
 assert.ok(!legacyItems.some(i => ['2-13', '7-00', '9-12', '6-03'].includes(i.q.id)), '뺀 문항은 화면 목록에 없다');
-assert.deepEqual(legacyItems.filter(i => i.q.id.startsWith('7-')).map(i => i.inst).filter((v, i, l) => l.indexOf(v) === i), ['진료 A'], '진료별 상세는 자신 있는 진료만');
-assert.equal(legacyItems.find(i => i.q.id === '7-03').req, 'recommended');
+const instsOf = id => legacyItems.filter(i => i.q.id === id).map(i => i.inst);
+for (const id of ['7-02', '7-03']) assert.deepEqual(instsOf(id), ['진료 A', '진료 B', '진료 C'], `${id}은 3-01 진료마다, 자신 있는 진료 먼저`);
+for (const id of ['7-01', '7-04', '7-05', '7-06', '7-07', '7-08']) assert.deepEqual(instsOf(id), ['진료 A'], `${id}은 자신 있는 진료만`);
+assert.deepEqual(legacyItems.filter(i => i.q.id === '7-03').map(i => i.req), ['recommended', undefined, undefined], '자신 있는 진료 칸만 권장');
 const lo = buildExport({ id: 'b1', name: 'x' }, { status: 'draft', submittedAt: null, answers: legacy }, null).owner.answers;
 for (const gone of ['2-13', '7-00', '9-12', '6-03', '7-04']) assert.ok(!(gone in lo), `${gone}은 JSON에 없다`);
-assert.deepEqual(lo['7-02'], { '진료 A': '가상 검사' });
+assert.deepEqual(lo['7-02'], { '진료 A': '가상 검사', '진료 B': '가상 검사 B' }, '7-02는 3-01 진료면 살고, 3-01에 없는 진료는 무시');
 assert.ok(!('2-13' in sanitizeAnswers('owner', legacy)), '다음 저장 때 뺀 문항 키는 받지 않는다');
 
 const none = buildExport({ id: 'b1', name: 'x' }, null, null);

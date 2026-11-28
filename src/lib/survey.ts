@@ -39,9 +39,9 @@ export interface Question {
   max?: number;       // pick: 고를 수 있는 수 / list: 칸 수 / table: 줄 수
   feel?: boolean;     // rank: 「체감으로 적음」 체크
   fields?: Field[];   // fields의 칸 / table의 열
-  /** 반복 묶음. treatment=진료마다, treatment-cf=진료마다(자신 있는 진료 먼저), confident=자신 있는 진료마다,
+  /** 반복 묶음. treatment=진료마다, confident=자신 있는 진료마다,
    *  doctor=원장마다, doctor-opt=의사 여럿이고 2-11을 골랐을 때만 원장마다 */
-  repeat?: 'treatment' | 'treatment-cf' | 'confident' | 'doctor' | 'doctor-opt';
+  repeat?: 'treatment' | 'confident' | 'doctor' | 'doctor-opt';
   when?: (a: Answers, ctx: Ctx, inst: string | null) => boolean;
   complete?: (v: unknown) => boolean; // 필수 판정에 「일부만 씀」을 가려야 할 때
   secret?: boolean;   // 계정 정보 — 답 JSON이 아니라 암호화 표에 저장, JSON 복사 제외
@@ -196,10 +196,6 @@ const OWNER: SurveyDef = {
           id: '2-12', label: '병원 이름으로 나가는 홍보에서는 어느 원장님을 가장 앞세울까요?',
           type: 'single', options: doctorsOf, req: 'recommended', when: multiDoctor,
         },
-        {
-          id: '2-13', label: '병원 프로그램(차트·예약)에서 뽑을 수 있는 자료', type: 'multi',
-          options: ['진료별 매출', '진료별 신규 환자 수', '환자 거주 지역', '내원 경로', '없음', '모름'],
-        },
       ],
     },
     {
@@ -259,7 +255,7 @@ const OWNER: SurveyDef = {
           label: '자격증·학회 회원증·인증서·논문 사본, 원장님 프로필 사진, 진료 공간·장비 사진, 진료 과정 사진·영상, 언론 보도 자료를 올려주세요.',
         },
         { id: '3-08-1', label: '진료와 상관없이 상담·사후관리에서 꼭 지키는 것', type: 'long' },
-        { id: '3-14', label: '원내에서 생각하는 가장 큰 강점', type: 'long' },
+        { id: '3-14', label: '원내에서 생각하는 가장 큰 강점, 환자분들께 가장 알리고 싶은 병원의 모습', type: 'long' },
       ],
     },
     {
@@ -280,9 +276,8 @@ const OWNER: SurveyDef = {
     },
     {
       title: '진료별 상세',
-      note: '콘텐츠를 만들 때 쓰는 재료입니다. 아는 만큼만 적어주세요.',
+      note: '콘텐츠를 만들 때 쓰는 재료입니다. 자신 있는 진료마다 한 벌씩, 아는 만큼만 적어주세요.',
       questions: [
-        { id: '7-00', label: '여러 진료에 공통으로 환자분들이 자주 묻는 질문과 그 답', type: 'long' },
         ...([
           ['7-01', '주로 어떤 증상이나 고민으로 오시나요?', 'long'],
           ['7-02', '검사·진단은 어떻게 하시나요?', 'long'],
@@ -293,9 +288,8 @@ const OWNER: SurveyDef = {
           ['7-07', '1회 비용(대략)과 보통 받으시는 횟수', 'text'],
           ['7-08', '지금까지 해 오신 건수(대략)', 'text'],
         ] as [string, string, 'long' | 'text'][]).map(([id, label, type]): Question => ({
-          id, label, type, repeat: 'treatment-cf',
-          // 자신 있는 진료의 검사·진단, 치료 순서만 권장
-          req: id === '7-02' || id === '7-03' ? (a, inst) => (inst && includes(a['3-06'], inst) ? 'recommended' : undefined) : undefined,
+          id, label, type, repeat: 'confident',
+          req: id === '7-02' || id === '7-03' ? 'recommended' : undefined,
         })),
       ],
     },
@@ -305,10 +299,8 @@ const OWNER: SurveyDef = {
       questions: ([
         ['6-01', '지금 진료과목을 고르신 이유', 'long'],
         ['6-02', '진료할 때 가장 중요하게 여기시는 생각(진료 철학)', 'long'],
-        ['6-03', '수련·근무하시며 기억에 남는 경험과 그때 느끼신 점', 'long'],
         ['6-04', '개원하신 계기와 이 지역을 고르신 이유', 'long'],
         ['6-05', '원장님 성격을 잘 드러내는 말 두세 개 (예: 꼼꼼함, 친근함, 솔직함)', 'text'],
-        ['6-06', '참여하시는 학회·세미나·강의 일정', 'long'],
       ] as [string, string, 'long' | 'text'][]).map(([id, label, type]): Question => ({ id, label, type, repeat: 'doctor' })),
     },
     {
@@ -316,10 +308,7 @@ const OWNER: SurveyDef = {
       note: '콘텐츠를 만들 때 쓰는 재료입니다.',
       questions: [
         ...longs([
-          ['8-01', '대표 장비의 이름과 그 장비를 고르신 이유'],
-          ['8-02', '원내 시설(검사실·수술실·회복실 등)을 갖추신 이유'],
-          ['8-03', '병원 공간을 꾸미며 특별히 신경 쓰신 점'],
-          ['8-04', '직원 교육이나 안전 점검은 어떻게 하시나요?'],
+          ['8-01', '대표 장비와 원내 시설(검사실·수술실·회복실 등)의 이름, 그것을 갖추신 이유'],
           ['8-05', '처음 상담부터 치료, 사후 관리까지 환자가 거치는 과정'],
         ]),
         {
@@ -339,19 +328,14 @@ const OWNER: SurveyDef = {
         ...longs([
           ['9-01', '기억에 남는 환자분 (이름·연락처 없이)'],
           ['9-02', '받으신 감사 인사나 선물 중 마음에 남은 것'],
-          ['9-03', '멀리서 일부러 찾아오시는 환자분이 있나요? 어디에서 오시나요?'],
           ['9-04', '지금 병원의 가장 큰 고민이나 아쉬운 점'],
         ]),
-        { id: '9-05', label: '지금까지 진료하신 환자 수(대략)', type: 'text' },
         { id: '9-06', label: '한 달 평균 환자 수와 신환 수', type: 'text' },
         { id: '9-07', label: '마케팅 뒤 신환 목표', type: 'fields', fields: GOALS },
         { id: '9-08', label: '마케팅 뒤 매출 목표', type: 'fields', fields: GOALS },
         ...longs([
           ['9-09', '의료진으로서 최종 목표'],
-          ['9-10', '앞으로 의료진을 더 모실 계획'],
-          ['9-11', '환자분들께 가장 알리고 싶은 병원의 모습'],
         ]),
-        { id: '9-12', label: '콘텐츠에서 특히 강조하고 싶은 진료', type: 'pick' },
         ...longs([
           ['9-13', '찾아오는 환자분께 드릴 수 있는 약속 한 가지'],
           ['9-14', '촬영과 원고 확인은 누가, 얼마나 자주 해 주실 수 있나요?'],
@@ -431,10 +415,6 @@ export function reqOf(q: Question, a: Answers, inst: string | null): Req | undef
 export function instancesOf(q: Question, a: Answers, ctx: Ctx): string[] | null {
   switch (q.repeat) {
     case 'treatment': return ctx.treatments;
-    case 'treatment-cf': {
-      const cf = confidentOf(a, ctx);
-      return [...cf, ...ctx.treatments.filter(t => !cf.includes(t))];
-    }
     case 'confident': return confidentOf(a, ctx);
     case 'doctor': { const d = chosenDoctors(a); return d.length ? d : ['대표원장']; }
     case 'doctor-opt': { const d = chosenDoctors(a); return d.length ? d : null; }

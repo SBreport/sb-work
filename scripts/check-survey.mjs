@@ -7,9 +7,10 @@ import {
 
 const ids = kind => SURVEYS[kind].pages.flatMap(p => p.questions.map(q => q.id));
 assert.equal(SURVEYS.owner.pages.length, 10);
-assert.equal(ids('owner').length, 84); // 문항 83 + 자료 올리기
+assert.equal(ids('owner').length, 72); // 문항 71 + 자료 올리기
 assert.equal(ids('counsel').length, 12);
-assert.equal(new Set([...ids('owner'), ...ids('counsel')]).size, 96, '문항 ID 중복');
+assert.equal(new Set([...ids('owner'), ...ids('counsel')]).size, 84, '문항 ID 중복');
+for (const gone of ['2-13', '6-03', '6-06', '7-00', '8-02', '8-03', '8-04', '9-03', '9-05', '9-10', '9-11', '9-12']) assert.ok(!ids('owner').includes(gone), `${gone}은 뺀 문항`);
 
 const owner = {
   '4-01': true,
@@ -30,7 +31,7 @@ const owner = {
   '3-07-1': { '진료 A': '안 보여야 함' },
   '3-11': { '진료 A': '멀어도 찾아오는 분이 많다', '진료 B': '모르겠다', '진료 C': '가까워서 오는 분이 많다' },
   '3-12': [{ name: '가상병원', reason: 'r', better: 'b', worse: 'w', extra: 'x' }, {}],
-  '7-02': { '진료 A': '가상 검사' },
+  '7-02': { '진료 A': '가상 검사', '진료 B': '자신 있는 진료가 아니라 빠져야 함' },
   '1-01': { id: 'x', pw: 'y' }, // 계정은 답 JSON에 들어오면 안 된다
 };
 const clean = sanitizeAnswers('owner', { ...owner, 'hack': 1 });
@@ -94,6 +95,17 @@ assert.deepEqual(out.counsel.answers['5-00'], { name: '가상실장', title: '�
 assert.deepEqual(out.counsel.answers['3-03'], { r1: ['진료 B'], r2: [], r3: [], unknown: false, feel: true });
 assert.deepEqual(out.counsel.answers['5-06'], ['진료 A', '진료 B']);
 assert.deepEqual(out.counsel.answers['5-02'], { '진료 A': '가상병원' });
+
+// 옛 답이 섞인 응답: 뺀 문항의 답과 3-06에 없는 진료의 7-xx 답은 오류 없이 무시된다(DB의 답은 고치지 않는다)
+const legacy = { ...owner, '2-13': ['진료별 매출'], '7-00': '옛 공통 질문', '9-12': ['진료 A'], '6-03': { 대표원장: '옛 답' }, '7-04': { '진료 C': '옛 답' } };
+const legacyItems = visibleItems('owner', legacy, ctx, filled);
+assert.ok(!legacyItems.some(i => ['2-13', '7-00', '9-12', '6-03'].includes(i.q.id)), '뺀 문항은 화면 목록에 없다');
+assert.deepEqual(legacyItems.filter(i => i.q.id.startsWith('7-')).map(i => i.inst).filter((v, i, l) => l.indexOf(v) === i), ['진료 A'], '진료별 상세는 자신 있는 진료만');
+assert.equal(legacyItems.find(i => i.q.id === '7-03').req, 'recommended');
+const lo = buildExport({ id: 'b1', name: 'x' }, { status: 'draft', submittedAt: null, answers: legacy }, null).owner.answers;
+for (const gone of ['2-13', '7-00', '9-12', '6-03', '7-04']) assert.ok(!(gone in lo), `${gone}은 JSON에 없다`);
+assert.deepEqual(lo['7-02'], { '진료 A': '가상 검사' });
+assert.ok(!('2-13' in sanitizeAnswers('owner', legacy)), '다음 저장 때 뺀 문항 키는 받지 않는다');
 
 const none = buildExport({ id: 'b1', name: 'x' }, null, null);
 assert.equal(none.counsel.status, 'none');

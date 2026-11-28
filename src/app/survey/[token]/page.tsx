@@ -224,7 +224,7 @@ export default function SurveyPage() {
       if (!insts.length) {
         out.push(
           <p key={`${q.id}:none`} className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-            {q.repeat === 'confident' ? '위에서 자신 있는 진료를 고르면 그 진료에 대한 질문이 나타납니다.' : kind === 'counsel' ? '위에 주요 진료를 먼저 적어주세요.' : '「진료와 순위」 페이지에서 주요 진료를 먼저 적어주세요.'}
+            {q.repeat === 'confident' ? '「자신 있는 진료」 페이지에서 진료를 고르면 그 진료에 대한 질문이 나타납니다.' : kind === 'counsel' ? '위에 주요 진료를 먼저 적어주세요.' : '「진료와 순위」 페이지에서 주요 진료를 먼저 적어주세요.'}
           </p>,
         );
         continue;
